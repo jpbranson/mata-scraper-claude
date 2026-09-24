@@ -57,21 +57,22 @@ Known limits of the vehicle payload, which shape the design:
                                       ├─▶ data/replay/YYYY-MM-DD.jsonl                       one frame per 30 s, for replay
                                       └─▶ data/vehicle_positions.pb                         GTFS-RT feed
 
- map.html  ── fetches data/latest.json every 10 s ──▶  live map      (served by python -m http.server)
+ map.html  ── data/latest.json every 10 s + the day's replay file ──▶  live map, replay  (served by python -m http.server)
  analysis.sql ── DuckDB reads data/positions/*/*.jsonl.gz ──▶  the three questions
- routes.csv / stops.csv ── built once by build_crosswalk.py ──▶  names and colors
+ routes.csv / stops.csv / network.geojson ── built by build_crosswalk.py ──▶  names, colors, route lines
 ```
 
 Four files do the work: the poller, the map page, the SQL file, and the
-crosswalk builder. Everything else in the repo is optional or a one-off probe.
+crosswalk builder. Everything else in the repo is optional or a one-off tool
+(`backfill_replay.py`, `cadavl_detours.py`, `probe_cadence.py`).
 
 ## Components
 
 ### 1. Poller — `cadavl_to_gtfs_rt.py`
 
-Runs forever under systemd. Each cycle, during service hours (04:00–24:00
-local): fetch `/topo/vehicules`, normalize each bus into a flat row, then
-write three things.
+Runs forever as a scheduled task (see Running it). Each cycle, during
+service hours (04:00–24:00 local): fetch `/topo/vehicules`, normalize each
+bus into a flat row, then write four things.
 
 **History — one row per bus per poll.** This is a change from the current
 code, which archives the raw payload separately and writes a position row only
@@ -108,12 +109,10 @@ one dependency. Kept because it is the standard interchange format, but
 nothing in this project consumes it. Delete it and `gtfs-realtime-bindings`
 if it ever gets in the way.
 
-Small cleanups to make while touching the file:
-
-- Load the `idLigne → route` mapping and colors from `routes.csv` at startup
-  instead of the hardcoded `LINE_TO_ROUTE_ID` / `ROUTE_NAMES` dicts, so a
-  crosswalk rebuild is the only step when MATA changes service.
-- Keep `StaleTracker` (ghost detection) and `parse_delay` as they are.
+The `idLigne → route` mapping and colors are loaded from `routes.csv` at
+startup (`load_routes`), so a crosswalk rebuild is the only step when MATA
+changes service. `StaleTracker` does ghost detection; `parse_delay` turns
+the vendor's text into seconds.
 
 ### 2. Crosswalk — `build_crosswalk.py`
 
@@ -143,7 +142,8 @@ Encodings, per bus:
 - **Fill = schedule adherence**, in tiers: early (blue), on time (grey, so
   problems stand out), 5+ / 10+ / 20+ min late (yellow → orange → red, the
   status palette). `"1h+"` capped values count as 20+.
-- **Size = passenger load** (`occupancy_pct`), radius 9–16 px.
+- **Size = passenger load** (`occupancy_pct`), radius 13–19 px (16–22 px
+  for three-character route numbers, so the digits fit).
 - **Number = route**, a wedge on the rim = heading.
 - **Trail** = the five minutes of positions before the viewed moment (from
   the replay frames), in the tier color, one segment per pair: bright,
@@ -162,7 +162,8 @@ snapshot is older than 90 s. Bottom-left legend. Bottom bar: play/pause,
 a scrubber across the day's frames, the clock, replay speed (10× / 60× /
 300× real time), LIVE, and a date picker for earlier days — so any moment
 of any recorded day can be revisited and played forward, with the same
-encodings and trails. The OSM basemap is muted
+encodings and trails. On phones (≤ 720 px wide) the scrubber gets its own
+row and the legend moves up out of its way. The OSM basemap is muted
 with a CSS filter so the data reads on top; dark mode inverts it and follows
 the OS setting.
 
@@ -170,7 +171,7 @@ Served by `python -m http.server` from the repo root — browsers block
 `fetch()` on `file://` URLs, so a server is required, but that one command
 is all of it.
 
-### 4. Analysis — `analysis.sql` (new)
+### 4. Analysis — `analysis.sql`
 
 DuckDB is an in-process analytical database: a single binary (or `pip install
 duckdb`) that queries files directly, so there is nothing to load, no schema
@@ -224,8 +225,8 @@ needed; don't pre-build them.
 ### 5. Detours — `cadavl_detours.py` (optional, deferred)
 
 Already parses `/topo/refresh` into GeoJSON lines and a GTFS-RT alerts feed.
-Not required for any of the three questions. If wanted later: hourly cron
-writes `data/detours.geojson`, and `map.html` draws it as a second layer.
+Not required for any of the three questions. If wanted later: an hourly
+scheduled task writes `data/detours.geojson`, and `map.html` draws it as a second layer.
 Nothing to do now.
 
 ### 6. Probes — `probe_cadence.py`
@@ -266,7 +267,7 @@ An always-on Windows machine at home. Chosen over the cloud free tiers:
 Google's e2-micro is free but its external IP is ~$3.65/month, Oracle's is
 $0 but has signup and idle-reclamation caveats, and a home box costs a few
 dollars a year in power. Needs are tiny: one 12 KB request every 10 s,
-~15 MB/day of disk.
+~25–30 MB/day of disk (history plus replay frames).
 
 Everything runs natively (Python, `http.server`, DuckDB); only "keep it
 running" is Windows-specific, and Task Scheduler does that. Install once
@@ -287,7 +288,8 @@ and opens port 8000 to the home LAN and Tailscale only:
   `http://localhost:8000/map.html`.
 
 After pulling new code, `.\ops\update.ps1` (same admin PowerShell) pulls,
-reinstalls requirements if they changed, and restarts both tasks.
+re-runs `pip install -r requirements.txt`, and restarts both tasks. For
+days recorded before replay existed, run `python backfill_replay.py` once.
 
 The machine's clock is already Central time, so the service-hours check
 needs no time-zone setting. Do set Power settings to never sleep (and, on
@@ -330,8 +332,9 @@ Steps 1–4 are done. Each left the project working; net line count went down.
    `latest.json`; delete raw archive, dedupe set, and the two hardcoded dicts.
 2. **Map.** Add `map.html`; delete `plot_bus_map.py` and `bus_map.html`.
 3. **Analysis.** Add `analysis.sql` with the three queries above.
-4. **Ops.** Add `requirements.txt`, the two unit files under `ops/`, and
-   `.gitignore` entries for generated files. Deploy and let it run.
+4. **Ops.** Add `requirements.txt`, `ops/setup.ps1` and `ops/update.ps1`
+   (Task Scheduler), and `.gitignore` entries for generated files. Deploy
+   and let it run.
 5. **After a week of data:** run the queries, sanity-check against personal
    experience of the routes, then decide the open questions below.
 
