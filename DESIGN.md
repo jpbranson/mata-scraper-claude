@@ -113,17 +113,19 @@ Run `python build_crosswalk.py --fetch` when the poller starts logging
 restructures a few times a year (every line ID changed between August and
 September 2026).
 
-Besides `routes.csv` and `stops.csv` it writes `shapes.geojson`: one
+Besides `routes.csv` and `stops.csv` it writes `network.geojson`: one
 MultiLineString per route, built from the 2-point segments in `/topo`,
 de-duplicated across a route's direction/branch variants and rounded to 5
-decimals. ~400 KB for the whole network; the map draws it as the background.
+decimals, plus one Point per stop with its name. Just under 1 MB; the map
+draws it as the background.
 
 ### 3. Live map — `map.html`
 
 One static page, Leaflet from a CDN, no build step. It fetches
-`data/latest.json` every 10 s and `shapes.geojson` once. Visual-first: the
+`data/latest.json` every 10 s and `network.geojson` once. Visual-first: the
 picture carries the information and text is confined to a tooltip and a
-three-number strip.
+three-number strip. All text is Inter (Google Fonts) at 16 px (12 pt) or
+larger, including the route numbers inside the markers.
 
 Encodings, per bus:
 
@@ -132,12 +134,16 @@ Encodings, per bus:
   status palette). `"1h+"` capped values count as 20+.
 - **Size = passenger load** (`occupancy_pct`), radius 9–16 px.
 - **Number = route**, a wedge on the rim = heading.
-- **Trail** = last five minutes of positions, in the same tier color.
+- **Trail** = last five minutes of positions, in the tier color, drawn as
+  one segment per pair: bright, thick and solid where the bus just was,
+  darker, thinner and fainter as it ages.
 - **Ghost** (`unchanged_polls` ≥ 30) = dashed hollow circle, no wedge.
 - Late buses are stacked on top of on-time ones.
 
-Around it: the whole network as hairlines; click a bus and its route
-highlights while the rest dims (click the map to clear). Hover for route,
+Around it: the whole network as hairlines and every stop as a small hollow
+dot (larger at higher zoom, hover for its name) — visible but clearly
+subordinate to the buses; click a bus and its route highlights while the
+rest dims (click the map to clear). Hover for route,
 headsign, delay text, load, fleet number. Top-right: buses in service, buses
 5+ min late, estimated riders (`CAPACITY = 40`). A dot goes red when the
 snapshot is older than 90 s. Bottom-left legend. The OSM basemap is muted
@@ -281,7 +287,7 @@ Analysis on Windows: download the DuckDB CLI (`duckdb.exe`, a single file)
 and run `Get-Content analysis.sql | .\duckdb.exe` from the repo folder.
 
 Git tracks code, the crosswalk outputs (`routes.csv`, `stops.csv`,
-`shapes.geojson`), `vehicules.json` (the sample payload for `--sample`), and
+`network.geojson`), `vehicules.json` (the sample payload for `--sample`), and
 this document. `data/` and the raw `topo.json` are ignored.
 
 Failure modes and the response to each:

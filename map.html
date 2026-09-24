@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MATA live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
@@ -19,32 +22,35 @@
     --surface: #1a1a19; --ink: #fff; --ink-2: #c3c2b7; --hairline: #4a4a47; --ring: rgba(255,255,255,.10);
     --early: #3987e5; --focus: #3987e5;
   } }
+  /* Minimum text size anywhere on the page is 12 pt = 16 px. */
   html, body, #map { height: 100%; margin: 0; background: var(--surface);
-    font: 13px system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); }
+    font: 16px/1.35 Inter, system-ui, sans-serif; color: var(--ink); }
   .panel { position: absolute; z-index: 1000; background: var(--surface); color: var(--ink);
-    border-radius: 8px; box-shadow: 0 0 0 1px var(--ring), 0 2px 8px rgba(0,0,0,.15); }
-  #stats { top: 12px; right: 12px; display: flex; gap: 18px; padding: 10px 14px; }
-  #stats b { display: block; font-size: 26px; font-weight: 600; line-height: 1; }
-  #stats span { font-size: 11px; color: var(--muted); }
-  #clock { position: absolute; top: 70px; right: 12px; z-index: 1000; font-size: 11px; color: var(--muted);
-    display: flex; align-items: center; gap: 5px; }
-  #clock i { width: 7px; height: 7px; border-radius: 50%; background: #0ca30c; }
+    border-radius: 10px; box-shadow: 0 0 0 1px var(--ring), 0 2px 10px rgba(0,0,0,.15); }
+  #stats { top: 14px; right: 14px; display: flex; gap: 24px; padding: 12px 18px; }
+  #stats b { display: block; font-size: 34px; font-weight: 600; line-height: 1.1; }
+  #stats span { color: var(--muted); }
+  #clock { position: absolute; top: 92px; right: 14px; z-index: 1000; color: var(--muted);
+    display: flex; align-items: center; gap: 6px; }
+  #clock i { width: 9px; height: 9px; border-radius: 50%; background: #0ca30c; }
   #clock.stale i { background: var(--late20); }
-  #legend { bottom: 24px; left: 12px; padding: 10px 12px; font-size: 11px; color: var(--ink-2); }
-  #legend div { display: flex; align-items: center; gap: 7px; margin: 3px 0; }
-  #legend i { width: 11px; height: 11px; border-radius: 50%; flex: none; }
-  #legend .sz { display: flex; align-items: center; gap: 4px; }
+  #legend { bottom: 28px; left: 14px; padding: 12px 16px; color: var(--ink-2); }
+  #legend div { display: flex; align-items: center; gap: 9px; margin: 4px 0; }
+  #legend i { width: 14px; height: 14px; border-radius: 50%; flex: none; }
   #legend .sz i { background: var(--muted); }
-  #legend .ghost i { background: none; border: 1.5px dashed var(--muted); }
+  #legend .ghost i { background: none; border: 2px dashed var(--muted); }
+  #legend .stop i { width: 8px; height: 8px; background: var(--surface); border: 2px solid var(--hairline); }
   .bus { background: none; border: none; }
   .bus svg { overflow: visible; }
-  .bus text { font: 600 10px system-ui, -apple-system, "Segoe UI", sans-serif; text-anchor: middle; }
-  .leaflet-tooltip { background: var(--surface); color: var(--ink); border: none; border-radius: 6px;
-    box-shadow: 0 0 0 1px var(--ring), 0 2px 8px rgba(0,0,0,.15); padding: 6px 9px; line-height: 1.35; }
+  .bus text { font: 600 16px Inter, system-ui, sans-serif; text-anchor: middle; }
+  .leaflet-tooltip { background: var(--surface); color: var(--ink); border: none; border-radius: 8px;
+    box-shadow: 0 0 0 1px var(--ring), 0 2px 10px rgba(0,0,0,.15); padding: 8px 12px;
+    font: 16px/1.35 Inter, system-ui, sans-serif; }
   .leaflet-tooltip::before { display: none; }
-  .leaflet-tooltip b { font-size: 13px; }
-  .leaflet-tooltip small { color: var(--muted); }
-  .leaflet-container { background: var(--surface); }
+  .leaflet-tooltip b { font-weight: 600; }
+  .leaflet-tooltip small { font-size: 16px; color: var(--muted); }
+  .leaflet-container { background: var(--surface); font: 16px Inter, system-ui, sans-serif; }
+  .leaflet-control-attribution { font-size: 16px; }
   .leaflet-tile-pane { filter: grayscale(1) contrast(.85) opacity(.7); }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .leaflet-tile-pane {
     filter: invert(1) grayscale(1) brightness(.75) contrast(1.1); } }
@@ -64,24 +70,26 @@
   <div><i style="background:var(--late5)"></i>5+ min late</div>
   <div><i style="background:var(--late10)"></i>10+ min late</div>
   <div><i style="background:var(--late20)"></i>20+ min late</div>
-  <div class="sz"><i style="width:8px;height:8px"></i><i style="width:15px;height:15px"></i>&nbsp;size = load</div>
+  <div class="sz"><i style="width:10px;height:10px"></i><i style="width:18px;height:18px"></i>&nbsp;size = load</div>
   <div class="ghost"><i></i>no GPS movement</div>
+  <div class="stop"><i></i>stop</div>
 </div>
 <script>
 // Reads data/latest.json (written by cadavl_to_gtfs_rt.py every poll) and
-// shapes.geojson (built by build_crosswalk.py). Serve the repo root over
-// HTTP — fetch() won't work over file://.
+// network.geojson (routes + stops, built by build_crosswalk.py). Serve the
+// repo root over HTTP — fetch() won't work over file://.
 const POLL_MS = 10000, GHOST_POLLS = 30, CAPACITY = 40;
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const dark = matchMedia("(prefers-color-scheme: dark)");
 
 const map = L.map("map", { preferCanvas: true, zoomControl: false }).setView([35.12, -89.97], 12);
 L.control.zoom({ position: "bottomright" }).addTo(map);
+// Trails get their own pane so they always paint above the network and stops
+// (overlay pane is z 400, markers 600).
+map.createPane("trails").style.zIndex = 450;
 // OSM tiles, muted by CSS (see .leaflet-tile-pane) so the data reads on top.
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19,
   attribution: "&copy; OpenStreetMap contributors" }).addTo(map);
-function theme() { if (network) network.setStyle(routeStyle); }
-dark.addEventListener("change", theme);
 
 // --- Delay tiers -----------------------------------------------------------
 function tier(v) {
@@ -95,44 +103,76 @@ function tier(v) {
 }
 const RANK = { ontime: 0, early: 1, late5: 2, late10: 3, late20: 4 };
 
-// --- Network ---------------------------------------------------------------
-let network = null, focusRoute = null;
+// --- Network: route lines + stops ------------------------------------------
+let routes = null, stops = null, focusRoute = null;
 const routeStyle = (f) => f.properties.route_id === focusRoute
   ? { color: css("--focus"), weight: 5, opacity: .9 }
   : { color: css("--hairline"), weight: 2, opacity: focusRoute ? .35 : .8 };
-fetch("shapes.geojson").then(r => r.json()).then(gj => {
-  network = L.geoJSON(gj, { style: routeStyle, interactive: false }).addTo(map);
-  network.bringToBack();
+// Stops only from zoom 13 in; city-wide they would just dot over the routes.
+const STOP_ZOOM = 13;
+const stopStyle = () => ({ radius: map.getZoom() >= 15 ? 4.5 : 3, color: css("--hairline"),
+  weight: 1.5, fillColor: css("--surface"), fillOpacity: 1, opacity: .9 });
+fetch("network.geojson").then(r => r.json()).then(gj => {
+  routes = L.geoJSON(gj, { filter: f => f.geometry.type !== "Point", style: routeStyle,
+    interactive: false }).addTo(map);
+  stops = L.geoJSON(gj, { filter: f => f.geometry.type === "Point",
+    pointToLayer: (f, ll) => L.circleMarker(ll, stopStyle())
+      .bindTooltip(f.properties.stop, { direction: "top", offset: [0, -6], opacity: 1 }) });
+  routes.bringToBack();
+  restyle();
 });
+function restyle() {
+  if (routes) routes.setStyle(routeStyle);
+  if (!stops) return;
+  stops.setStyle(stopStyle());
+  if (map.getZoom() >= STOP_ZOOM) { if (!map.hasLayer(stops)) stops.addTo(map); }
+  else if (map.hasLayer(stops)) map.removeLayer(stops);
+}
+map.on("zoomend", restyle);
 map.on("click", () => setFocus(null));
+dark.addEventListener("change", restyle);
 function setFocus(routeId) {
   focusRoute = routeId === focusRoute ? null : routeId;
-  if (network) network.setStyle(routeStyle);
+  if (routes) routes.setStyle(routeStyle);
 }
-theme();
 
 // --- Buses -----------------------------------------------------------------
 const markers = {}, trails = {};
 function icon(v) {
   const ghost = v.unchanged_polls >= GHOST_POLLS;
   const t = tier(v), fill = css("--" + t);
-  const r = 9 + 7 * Math.min(v.occupancy_pct ?? 0, 100) / 100;
-  const box = r + 8;
+  // Big enough for 16 px digits; grows with passenger load.
+  const r = (v.route_id.length > 2 ? 16 : 13) + 6 * Math.min(v.occupancy_pct ?? 0, 100) / 100;
+  const box = r + 10;
   const textColor = t === "late5" ? "#0b0b0b" : "#fff";
   const wedge = (!ghost && v.bearing != null)
-    ? `<path d="M0,${-r - 7} L4.5,${-r - 1} L-4.5,${-r - 1} Z" fill="${fill}" transform="rotate(${v.bearing})"/>` : "";
+    ? `<path d="M0,${-r - 9} L6,${-r - 1} L-6,${-r - 1} Z" fill="${fill}" transform="rotate(${v.bearing})"/>` : "";
   const circle = ghost
-    ? `<circle r="${r}" fill="${css("--surface")}" stroke="${css("--muted")}" stroke-width="1.5" stroke-dasharray="3 2"/>`
-    : `<circle r="${r}" fill="${fill}" stroke="${css("--surface")}" stroke-width="2"/>`;
+    ? `<circle r="${r}" fill="${css("--surface")}" stroke="${css("--muted")}" stroke-width="2" stroke-dasharray="4 3"/>`
+    : `<circle r="${r}" fill="${fill}" stroke="${css("--surface")}" stroke-width="2.5"/>`;
   return L.divIcon({ className: "bus", iconSize: [box * 2, box * 2], iconAnchor: [box, box],
     html: `<svg width="${box * 2}" height="${box * 2}" viewBox="${-box} ${-box} ${box * 2} ${box * 2}">
-      ${wedge}${circle}<text y="3.5" fill="${ghost ? css("--muted") : textColor}"
-        ${v.route_id.length > 2 ? 'font-size="8.5"' : ""}>${v.route_id}</text></svg>` });
+      ${wedge}${circle}<text y="5.5" fill="${ghost ? css("--muted") : textColor}">${v.route_id}</text></svg>` });
 }
 function tip(v) {
   const load = v.occupancy_pct == null ? "" : ` &middot; ${v.occupancy_pct}% full`;
   const ghost = v.unchanged_polls >= GHOST_POLLS ? `<br><small>no GPS movement for ${Math.round(v.unchanged_polls * POLL_MS / 60000)} min</small>` : "";
   return `<b>${v.route_id}</b> ${v.destination ?? ""}<br>${v.delay_raw ?? "no delay data"}${load}<br><small>bus ${v.equipment_no}</small>${ghost}`;
+}
+
+// Trail: one segment per pair of positions. Newest is bright and solid,
+// oldest is darkened and faint.
+const shade = (hex, k) => "#" + [1, 3, 5].map(i =>
+  Math.round(parseInt(hex.slice(i, i + 2), 16) * k).toString(16).padStart(2, "0")).join("");
+function drawTrail(group, pts, hex) {
+  group.clearLayers();
+  const n = pts.length - 1;
+  for (let i = 0; i < n; i++) {
+    const age = 1 - (i + 1) / n;                 // 0 = newest, 1 = oldest
+    group.addLayer(L.polyline([pts[i], pts[i + 1]], {
+      color: shade(hex, 1 - .6 * age), weight: 5 - 2.5 * age,
+      opacity: .95 - .8 * age, lineCap: "round", interactive: false, pane: "trails" }));
+  }
 }
 
 async function refresh() {
@@ -148,18 +188,14 @@ async function refresh() {
     if (v.occupancy_pct != null) riders += v.occupancy_pct / 100 * CAPACITY;
 
     const m = markers[v.vehicle_id] ??= L.marker(pos, { icon: icon(v) })
-      .bindTooltip("", { direction: "top", offset: [0, -14], opacity: 1 })
+      .bindTooltip("", { direction: "top", offset: [0, -20], opacity: 1 })
       .on("click", (e) => { L.DomEvent.stop(e); setFocus(m.routeId); })
       .addTo(map);
     m.routeId = v.route_id;
     m.setLatLng(pos).setIcon(icon(v)).setZIndexOffset(RANK[t] * 1000).setTooltipContent(tip(v));
 
     const pts = v.trail ?? [];
-    if (pts.length > 1) {
-      const style = { color: css("--" + t), weight: 3, opacity: .35, interactive: false };
-      const tr = trails[v.vehicle_id] ??= L.polyline(pts, style).addTo(map);
-      tr.setLatLngs(pts).setStyle(style);
-    }
+    if (pts.length > 1) drawTrail(trails[v.vehicle_id] ??= L.layerGroup().addTo(map), pts, css("--" + t));
   }
   for (const id in markers) if (!seen.has(id)) {
     map.removeLayer(markers[id]); delete markers[id];

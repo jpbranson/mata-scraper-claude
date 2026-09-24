@@ -9,7 +9,7 @@ captured) — poll that cheaply and only re-download /topo when it changes.
     python build_crosswalk.py --topo topo.json
     python build_crosswalk.py --fetch          # download it fresh
 
-Writes routes.csv, stops.csv and shapes.geojson next to the script.
+Writes routes.csv, stops.csv and network.geojson next to the script.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ from cadavl_to_gtfs_rt import BASE, HEADERS
 
 ROUTES_CSV = Path("routes.csv")
 STOPS_CSV = Path("stops.csv")
-SHAPES_GEOJSON = Path("shapes.geojson")
+NETWORK_GEOJSON = Path("network.geojson")
 VERSION_PATH = Path("topo_version.txt")
 
 
@@ -73,13 +73,14 @@ def extract_stops(topo: dict) -> list[dict]:
     return rows
 
 
-def extract_shapes(topo: dict) -> dict:
-    """One MultiLineString per line, for drawing the network on the map.
+def extract_network(topo: dict) -> dict:
+    """Route lines and stop points, for drawing the network on the map.
 
     Each line has several `itineraire`s (direction/branch variants) made of
     2-point `troncons` that overlap heavily between variants. Segments are
-    emitted once per line, chained into runs while consecutive, and rounded
-    to 5 decimals (~1 m). About 400 KB for the whole network."""
+    emitted once per line as one MultiLineString, chained into runs while
+    consecutive, and rounded to 5 decimals (~1 m). Stops are Points with
+    their name. Just under 1 MB for the whole network."""
     features = []
     for ligne in topo["topo"][0]["ligne"]:
         seen: set[int] = set()
@@ -107,6 +108,16 @@ def extract_shapes(topo: dict) -> dict:
             "properties": {"route_id": ligne["nomCommercial"],
                            "name": ligne["libCommercial"]},
             "geometry": {"type": "MultiLineString", "coordinates": parts},
+        })
+    for stop in topo["topo"][0]["pointArret"]:
+        loc = stop.get("localisation") or {}
+        if loc.get("lat") is None:
+            continue
+        features.append({
+            "type": "Feature",
+            "properties": {"stop": stop.get("nomCommercial")},
+            "geometry": {"type": "Point",
+                         "coordinates": [round(loc["lng"], 5), round(loc["lat"], 5)]},
         })
     return {"type": "FeatureCollection", "features": features}
 
@@ -140,8 +151,8 @@ def main() -> None:
     routes = extract_routes(topo)
     write_csv(ROUTES_CSV, routes)
     write_csv(STOPS_CSV, extract_stops(topo))
-    SHAPES_GEOJSON.write_text(json.dumps(extract_shapes(topo), separators=(",", ":")))
-    print(f"wrote {SHAPES_GEOJSON} ({SHAPES_GEOJSON.stat().st_size // 1024} KB)")
+    NETWORK_GEOJSON.write_text(json.dumps(extract_network(topo), separators=(",", ":")))
+    print(f"wrote {NETWORK_GEOJSON} ({NETWORK_GEOJSON.stat().st_size // 1024} KB)")
 
     print("\nroute crosswalk:")
     for r in routes:
