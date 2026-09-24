@@ -316,8 +316,10 @@ def run_poller() -> None:
             print(f"{len(rows)} vehicles, "
                   f"{sum(r['unchanged_polls'] == 0 for r in rows)} moved")
 
-        except requests.RequestException as exc:
-            print(f"fetch failed: {exc}")
+        except (requests.RequestException, OSError) as exc:
+            # OSError covers Windows refusing to replace latest.json while
+            # http.server has it open; the next poll rewrites it anyway.
+            print(f"poll failed: {exc}")
 
         time.sleep(POLL_SECONDS)
 

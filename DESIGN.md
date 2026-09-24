@@ -217,32 +217,42 @@ queries rather than renaming partitions).
 
 ## Running it
 
-One always-on machine at home (Raspberry Pi, old laptop, mini PC) running
-Debian or Ubuntu. Chosen over the cloud free tiers: Google's e2-micro is
-free but its external IP is ~$3.65/month, Oracle's is $0 but has signup
-and idle-reclamation caveats, and a home box costs a few dollars a year in
-power. Needs are tiny: one 12 KB request every 10 s, ~15 MB/day of disk.
+An always-on Windows machine at home. Chosen over the cloud free tiers:
+Google's e2-micro is free but its external IP is ~$3.65/month, Oracle's is
+$0 but has signup and idle-reclamation caveats, and a home box costs a few
+dollars a year in power. Needs are tiny: one 12 KB request every 10 s,
+~15 MB/day of disk.
 
-Install with `ops/setup.sh` (run as a sudo-capable user on the machine):
-it installs git and Python, clones to `/opt/mata-scraper-claude`, makes a
-venv from `requirements.txt` (`requests`, `gtfs-realtime-bindings`,
-`duckdb`), and installs two systemd units as your user, both
-`Restart=always`:
+Everything runs natively (Python, `http.server`, DuckDB); only "keep it
+running" is Windows-specific, and Task Scheduler does that. Install once
+from an administrator PowerShell in the repo folder, with Python 3.10+ on
+PATH:
 
-- `ops/mata-poller.service` — `python cadavl_to_gtfs_rt.py`, with
-  `Environment=TZ=America/Chicago` so the service-hours check is local. On
-  a UTC host without it, the poller sleeps every evening.
-- `ops/mata-web.service` — `python -m http.server 8000`; the map is at
-  `http://<host>:8000/map.html`.
+    Set-ExecutionPolicy -Scope Process Bypass
+    .\ops\setup.ps1
+
+It makes the venv from `requirements.txt` (`requests`,
+`gtfs-realtime-bindings`, `duckdb`), registers two scheduled tasks that
+start at boot with nobody logged in and restart a minute after any crash,
+and opens port 8000 to the home LAN and Tailscale only:
+
+- `mata-poller` — `python -u cadavl_to_gtfs_rt.py`, output appended to
+  `data\poller.log` (a few hundred KB per day; delete it whenever).
+- `mata-web` — `python -m http.server 8000`; the map is at
+  `http://localhost:8000/map.html`.
+
+The machine's clock is already Central time, so the service-hours check
+needs no time-zone setting. Do set Power settings to never sleep (and, on
+a laptop, "do nothing" on lid close, plugged in).
 
 Reaching the map away from home: install Tailscale (free for personal use)
 on the machine and your phone. It makes a private network between your own
-devices, so the same URL works anywhere with no router ports opened and
-nothing exposed to the internet. Don't port-forward 8000 instead;
-`http.server` is not meant to face the public internet.
+devices, so `http://<machine-name>:8000/map.html` works anywhere with no
+router ports opened and nothing exposed to the internet. Don't port-forward
+8000 instead; `http.server` is not meant to face the public internet.
 
-Laptop specifics: disable sleep on lid close (`HandleLidSwitch=ignore` in
-`/etc/systemd/logind.conf`), and keep it plugged in.
+Analysis on Windows: download the DuckDB CLI (`duckdb.exe`, a single file)
+and run `Get-Content analysis.sql | .\duckdb.exe` from the repo folder.
 
 Git tracks code, the crosswalk CSVs, `vehicules.json` (the sample payload
 for `--sample`), and this document. `data/` and generated HTML are ignored.
@@ -251,7 +261,7 @@ Failure modes and the response to each:
 
 - Vendor down or slow → the poller logs and retries next cycle. Gaps in the
   history are just missing rows.
-- Machine reboots → systemd restarts both units; the day file is appended,
+- Machine reboots → Task Scheduler restarts both tasks; the day file is appended,
   not overwritten.
 - MATA changes routes → unmapped lines show as `cadavl:<id>`; rebuild the
   crosswalk. Old rows keep their old `route_id`, which is correct.
