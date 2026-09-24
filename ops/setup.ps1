@@ -17,8 +17,24 @@ $ErrorActionPreference = "Stop"
 $dir = (Resolve-Path "$PSScriptRoot\..").Path
 $py  = "$dir\.venv\Scripts\python.exe"
 
-python -m venv "$dir\.venv"
+# Prefer the `py` launcher (installed by python.org even without "Add to
+# PATH"). A bare `python` may be the Microsoft Store placeholder, which
+# prints an install prompt and exits non-zero, so verify it actually runs.
+$python = $null
+foreach ($candidate in "py", "python") {
+    $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
+    if ($cmd -and (& $cmd.Source --version 2>$null) -match "^Python 3\.(1\d|[2-9]\d)") {
+        $python = $cmd.Source; break
+    }
+}
+if (-not $python) {
+    throw "Python 3.10+ not found. Install it from https://www.python.org/downloads/ (tick 'Add python.exe to PATH'), open a new PowerShell, and re-run."
+}
+
+& $python -m venv "$dir\.venv"
+if (-not (Test-Path $py)) { throw "venv creation failed; see output above." }
 & $py -m pip install -q -r "$dir\requirements.txt"
+if ($LASTEXITCODE -ne 0) { throw "pip install failed; see output above." }
 New-Item -ItemType Directory -Force "$dir\data" | Out-Null
 
 $settings = New-ScheduledTaskSettingsSet `
