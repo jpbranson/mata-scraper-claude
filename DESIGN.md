@@ -287,8 +287,10 @@ and opens port 8000 to the home LAN and Tailscale only:
 - `mata-web` — `python -m http.server 8000`; the map is at
   `http://localhost:8000/map.html`.
 
-After pulling new code, `.\ops\update.ps1` (same admin PowerShell) pulls,
-re-runs `pip install -r requirements.txt`, and restarts both tasks. For
+After pulling new code, `.\ops\update.ps1` pulls, re-runs
+`pip install -r requirements.txt`, and restarts both tasks. It needs no
+admin: setup grants the installing account read + execute on both tasks,
+which is enough to start and stop them. For
 days recorded before replay existed, run `python backfill_replay.py` once.
 
 The machine's clock is already Central time, so the service-hours check

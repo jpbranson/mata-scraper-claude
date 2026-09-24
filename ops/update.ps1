@@ -1,5 +1,5 @@
-# Pull the latest code and restart both tasks. Run from an administrator
-# PowerShell in the repo folder:
+# Pull the latest code and restart both tasks. Run from PowerShell in the repo
+# folder (no admin needed; setup.ps1 lets your account start and stop them):
 #
 #   .\ops\update.ps1
 $ErrorActionPreference = "Stop"

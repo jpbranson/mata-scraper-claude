@@ -51,10 +51,18 @@ $tasks = @(
        Args = "/c `"`"$py`" -u cadavl_to_gtfs_rt.py >> data\poller.log 2>&1`"" },
     @{ Name = "mata-web";    Exec = $py; Args = "-m http.server 8000" }
 )
+# By default only admins may start or stop the tasks; also give this account
+# read + execute (GRGX, which covers start and stop) so update.ps1 can run from
+# a normal, non-admin PowerShell.
+$sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+$scheduler = New-Object -ComObject Schedule.Service
+$scheduler.Connect()
 foreach ($t in $tasks) {
     $action = New-ScheduledTaskAction -Execute $t.Exec -Argument $t.Args -WorkingDirectory $dir
     Register-ScheduledTask -TaskName $t.Name -Action $action -Trigger $trigger `
         -Settings $settings -Principal $principal -Force | Out-Null
+    $scheduler.GetFolder("\").GetTask($t.Name).SetSecurityDescriptor(
+        "D:(A;;FA;;;BA)(A;;FA;;;SY)(A;;GRGX;;;$sid)", 0)
     Start-ScheduledTask -TaskName $t.Name
 }
 
