@@ -28,6 +28,15 @@ live in the docstrings of the scripts.
 | `/config/version` | Integer that bumps when `/topo` changes | tiny | Know when to rebuild the crosswalk |
 | `/topo/refresh` | Current detours (bypassed and replacement segments) | ~385 KB, changes over days | Optional detour overlay |
 | `/iv/message` | Rider-facing alert text | small | Optional detour overlay |
+| `/horaires/pta/<stop id>` | The tracker's own stop popup: next one or two times per route | small | Nothing (no CORS, so the page can't call it; kept as a cross-check) |
+| `gtfs.mata.cadavl.com/MATA/GTFS/GTFS_MATA.zip` | MATA's published timetable (GTFS), same vendor | ~1.5 MB, rebuilt nightly | Stop schedules and trip matching (`schedule.py`) |
+
+The GTFS feed lines up with the tracker exactly: GTFS `stop_id` is `"0:"` +
+the tracker's stop code (`mnemoPointArret`, `stop_code` in `stops.csv`),
+`route_id` is the route number, and `trip_headsign` is the bus's
+`destination`, trailing spaces and all. The vendor's delay is measured
+against this timetable (checked: a bus "8 min late" at LAMAR @LAPALOMA at
+18:01 is the 17:52:59 trip).
 
 Known limits of the vehicle payload, which shape the design:
 
@@ -35,12 +44,17 @@ Known limits of the vehicle payload, which shape the design:
   coordinates don't change across many polls is a dropped GPS feed (a "ghost"),
   not a parked bus; `unchanged_polls` counts that.
 - **No trip or block ID.** We know the route and headsign, not which scheduled
-  trip a bus is on. Delay is whatever the vendor reports (`avanceRetard`), not
-  something we compute.
-- **Delay is capped.** `"1h+ late"` means "at least an hour", flagged
-  `delay_capped`. Those rows are usually misassigned buses; exclude them.
-- **Line IDs are opaque.** Internal `idLigne` (e.g. 109149) maps to route
-  "01" only by lookup, and the lookup changes when MATA restructures service.
+  trip a bus is on; `schedule.py` infers it (see below). Delay is whatever
+  the vendor reports (`avanceRetard`), not something we compute.
+- **Delay is capped.** `"1h+ late"` / `"1h+ early"` mean "at least an hour",
+  stored as ±3600 and flagged `delay_capped`. Those rows are usually
+  misassigned buses; exclude them. (Pollers before 2026-09-24 stored them as
+  0; `backfill_replay.py` re-parses `delay_raw`.)
+- **Line and stop IDs are opaque and unstable.** Internal `idLigne` (e.g.
+  111302) maps to route "36" only by lookup, and every ID changes when the
+  vendor publishes a new topo version — which happened twice in September
+  2026, days apart. Stop codes (`LAMLAPEN`) and route numbers are stable;
+  key everything on those.
 - **Speed unit unknown.** `vitesse` ranges 0–20; `probe_cadence.py` can settle
   whether it's mph or km/h. Not needed for any of the three questions.
 - **Load is a percentage** of an unknown capacity, presumably from the bus's
@@ -55,16 +69,20 @@ Known limits of the vehicle payload, which shape the design:
                                       ├─▶ data/positions/dt=YYYY-MM-DD/positions.jsonl.gz   history (append)
                                       ├─▶ data/latest.json                                  current snapshot
                                       ├─▶ data/replay/YYYY-MM-DD.jsonl                       one frame per 30 s, for replay
+                                      ├─▶ data/schedule/YYYY-MM-DD/, data/arrivals/YYYY-MM-DD/  timetable + when buses came (schedule.py)
                                       └─▶ data/vehicle_positions.pb                         GTFS-RT feed
+ GTFS_MATA.zip ── once a day ──▶ poller (schedule.py)
+ /topo ── when line IDs change ──▶ poller (build_crosswalk.py) ──▶ routes.csv, stops.csv, network.geojson
 
- map.html  ── data/latest.json every 10 s + the day's replay file ──▶  live map, replay  (served by python -m http.server)
+ map.html  ── data/latest.json every 10 s + the day's replay file + stop files on click ──▶  live map, replay, stop times  (served by python -m http.server)
  analysis.sql ── DuckDB reads data/positions/*/*.jsonl.gz ──▶  the three questions
  routes.csv / stops.csv / network.geojson ── built by build_crosswalk.py ──▶  names, colors, route lines
 ```
 
-Four files do the work: the poller, the map page, the SQL file, and the
-crosswalk builder. Everything else in the repo is optional or a one-off tool
-(`backfill_replay.py`, `cadavl_detours.py`, `probe_cadence.py`).
+Five files do the work: the poller, its timetable module, the map page,
+the SQL file, and the crosswalk builder. Everything else in the repo is
+optional or a one-off tool (`backfill_replay.py`, `cadavl_detours.py`,
+`probe_cadence.py`).
 
 ## Components
 
@@ -93,16 +111,18 @@ Parquet with one DuckDB `COPY` — not now.
 
 **Snapshot — `data/latest.json`.** The same rows for the current poll plus
 `fetched_at`, written atomically (tmp file + rename). The map reads this; so
-does the "right now" query.
+does the "right now" query. Each bus also carries `trail`, its last ten
+replay positions (one per 30 s), held in memory and seeded from the replay
+file when the poller starts, so the map draws full trails the moment it
+opens without waiting for the multi-MB replay file.
 
 **Replay — `data/replay/<local day>.jsonl`.** Every third poll (30 s) one
 compact line: the poll time and, per bus, `[id, route, lat, lon, bearing,
 delay_seconds, delay_capped, occupancy_pct, unchanged_polls]`. 59 B per bus
 per frame, ~5–7 MB for a full day. `python backfill_replay.py [day]` rebuilds
-these from the full history — for days recorded before this existed, or
-after any gap. The map loads the viewed day's file once; it drives both the
-replay scrubber and the trails (so trails are there the moment the page
-opens, not five minutes after the poller starts).
+these (and the day's arrivals) from the full history — for days recorded
+before this existed, or after any gap. The map loads the viewed day's file
+once; it drives the replay scrubber and the trails while replaying.
 
 **GTFS-RT — `data/vehicle_positions.pb`.** Already implemented; ~30 lines and
 one dependency. Kept because it is the standard interchange format, but
@@ -110,29 +130,62 @@ nothing in this project consumes it. Delete it and `gtfs-realtime-bindings`
 if it ever gets in the way.
 
 The `idLigne → route` mapping and colors are loaded from `routes.csv` at
-startup (`load_routes`), so a crosswalk rebuild is the only step when MATA
-changes service. `StaleTracker` does ghost detection; `parse_delay` turns
-the vendor's text into seconds.
+startup (`load_routes`). When a poll has buses on lines it doesn't know
+(`cadavl:<id>`), at most every 15 minutes it asks `/config/version`; if
+that moved past the version recorded in `network.geojson`, it rebuilds the
+crosswalk (`build_crosswalk.refresh`, a ~28 MB download) and reloads, so
+a renumbering fixes itself within a poll or two. `StaleTracker` does ghost
+detection; `parse_delay` turns the vendor's text into seconds.
+
+**Timetable and arrivals — `schedule.py`.** Once per service day (and at
+startup) the poller downloads `GTFS_MATA.zip` if the server's copy is newer
+than `data/gtfs.zip`, loads today's trips, and writes for the map:
+
+- `data/schedule/<day>/stops.json` — stop code → routes scheduled there
+  (from the timetable, not `/topo`, which lists lines that pass without
+  stopping).
+- `data/schedule/<day>/<route>.json` — that route's trips (id, headsign)
+  and, per stop, seconds after local midnight (`t0`). 25 files, ~0.8 MB
+  a day.
+
+Every poll it then does two matches:
+
+- **Trip.** The trip a bus is running is the one of its route and headsign
+  due at its next stop closest to *now + ETA − reported delay*, within 20
+  minutes. Stored as `trip_id` on the row. Needs an uncapped delay.
+- **Arrival.** When a bus's next stop changes away from A, it has served A,
+  at the time of the last poll that still showed A (±10 s). The stop is the
+  one named A on that route and direction nearest the bus (names repeat
+  across the street), and the trip is matched as above. Skipped if the bus
+  was over 300 m away or the polls were over two minutes apart. Appended
+  to `data/arrivals/<day>/<route>.jsonl` as `{t, stop, vehicle, trip,
+  delay}` — ~40k a day, ~2.5 MB, split by route so the map fetches only
+  the routes at a clicked stop.
+
+Checked live: every arrival's actual − scheduled time agreed with the
+vendor's reported delay to within a minute. A failure here is logged and
+never costs a poll.
 
 ### 2. Crosswalk — `build_crosswalk.py`
 
-Run `python build_crosswalk.py --fetch` when the poller starts logging
-`route_id = cadavl:<n>` (an unmapped line), which is the signal that
-`/config/version` bumped. Commit the results. No scheduler needed; MATA
-restructures a few times a year (every line ID changed between August and
-September 2026).
+The poller runs it when line IDs change (above); by hand,
+`python build_crosswalk.py --fetch`. Commit the results when convenient —
+`ops/update.ps1` discards the poller's local copies before pulling, and the
+poller rebuilds again if the pulled ones are stale.
 
 Besides `routes.csv` and `stops.csv` it writes `network.geojson`: one
 MultiLineString per route, built from the 2-point segments in `/topo`,
 de-duplicated across a route's direction/branch variants and rounded to 5
-decimals, plus one Point per stop with its name. Just under 1 MB; the map
-draws it as the background.
+decimals, plus one Point per stop with its name and code, and the topo
+version it was built from (`topo_version`). Just under 1 MB; the map draws
+it as the background.
 
 ### 3. Live map — `map.html`
 
 One static page, Leaflet from a CDN, no build step. It fetches
-`data/latest.json` every 10 s, the day's `data/replay/` file once, and
-`network.geojson` once. Visual-first: the
+`data/latest.json` every 10 s, the day's `data/replay/` file once (in the
+background; the live view doesn't wait for it), `network.geojson` once,
+and a clicked stop's schedule and arrival files. Visual-first: the
 picture carries the information and text is confined to a tooltip and a
 three-number strip. All text is Inter (Google Fonts) at 16 px (12 pt) or
 larger, including the route numbers inside the markers.
@@ -141,21 +194,29 @@ Encodings, per bus:
 
 - **Fill = schedule adherence**, in tiers: early (blue), on time (grey, so
   problems stand out), 5+ / 10+ / 20+ min late (yellow → orange → red, the
-  status palette). `"1h+"` capped values count as 20+.
+  status palette). `"1h+"` capped values count as 20+ late or early,
+  matching their direction.
 - **Size = passenger load** (`occupancy_pct`), radius 13–19 px (16–22 px
   for three-character route numbers, so the digits fit).
 - **Number = route**, a wedge on the rim = heading.
-- **Trail** = the five minutes of positions before the viewed moment (from
-  the replay frames), in the tier color, one segment per pair: bright,
+- **Trail** = the last ten positions, 30 s apart (live, from `latest.json`;
+  replaying, from the frames), in the tier color, one segment per pair: bright,
   thick and solid where the bus just was, darker, thinner and fainter as it
   ages.
 - **Ghost** (`unchanged_polls` ≥ 30) = dashed hollow circle, no wedge.
 - Late buses are stacked on top of on-time ones.
 
 Around it: the whole network as hairlines and every stop as a small hollow
-dot (larger at higher zoom, hover for its name) — visible but clearly
-subordinate to the buses; click a bus and its route highlights while the
-rest dims (click the map to clear). Hover for route,
+dot with a high-contrast ring (light on the dark basemap, larger at higher
+zoom, hover for its name) — visible but subordinate to the buses. Click a
+bus and its route highlights, drawn over the other lines, while every other
+route and bus dims (click the bus again or the map to clear). Click a stop
+and the routes that stop there highlight, and a panel lists for each route
+the last three and next three scheduled trips: when each bus actually came
+(with minutes late/early in the tier colors), "not seen" when no arrival
+was recorded, and, live, "~time" when a bus on that trip is on its way
+(scheduled + its current delay). Replaying, the panel shows the same as of
+the viewed moment. Clock times are Memphis time wherever the viewer is. Hover for route,
 headsign, delay text, load, fleet number. Top-right: buses in service, buses
 5+ min late, estimated riders (`CAPACITY = 40`). A dot goes red when the
 snapshot is older than 90 s. Bottom-left legend. Bottom bar: play/pause,
@@ -260,6 +321,7 @@ queries rather than renaming partitions).
 | `delay_raw` | str | Vendor text, e.g. "4 min late" |
 | `delay_capped` | bool | True for "1h+" values — a floor, not a measurement |
 | `unchanged_polls` | int | Consecutive polls with identical coordinates; ghost signal |
+| `trip_id` | str | GTFS trip the bus is inferred to be running; null if unmatched (from 2026-09-24) |
 
 ## Running it
 
@@ -291,7 +353,9 @@ After pulling new code, `.\ops\update.ps1` pulls, re-runs
 `pip install -r requirements.txt`, and restarts both tasks. It needs no
 admin: setup grants the installing account read + execute on both tasks,
 which is enough to start and stop them. For
-days recorded before replay existed, run `python backfill_replay.py` once.
+days recorded before replay or arrivals existed, run
+`python backfill_replay.py` once (stop the poller first if it includes
+today).
 
 The machine's clock is already Central time, so the service-hours check
 needs no time-zone setting. Do set Power settings to never sleep (and, on
@@ -321,8 +385,12 @@ Failure modes and the response to each:
   history are just missing rows.
 - Machine reboots → Task Scheduler restarts both tasks; the day file is appended,
   not overwritten.
-- MATA changes routes → unmapped lines show as `cadavl:<id>`; rebuild the
-  crosswalk. Old rows keep their old `route_id`, which is correct.
+- MATA changes routes or renumbers lines → the poller notices unmapped
+  lines and rebuilds the crosswalk itself. Rows from before the rebuild
+  keep `cadavl:<id>`; `backfill_replay.py <day>` remaps them for the replay
+  and arrivals files.
+- GTFS feed down → the cached `data/gtfs.zip` is used; with none, stop
+  panels say there's no timetable and everything else carries on.
 - Vendor changes the JSON shape → `normalize_vehicle` returns nothing useful;
   the `--sample` check against a freshly saved payload is the debugging tool.
 
@@ -355,9 +423,9 @@ Steps 1–4 are done. Each left the project working; net line count went down.
 
 ## Non-goals
 
-- Schedule comparison (matching buses to GTFS trips). The vendor already
-  reports delay; computing our own would need the static GTFS and a lot of
-  code for a marginally better number.
+- Computing our own delay. The vendor's reported delay is kept as the
+  measure; the GTFS timetable is used only to name trips and show stop
+  schedules, and actual − scheduled agrees with it anyway.
 - Multi-agency support, a REST API, user accounts, alerting, dashboards
   beyond the one map page and the SQL file.
 - Unit tests. The offline `--sample` run against `vehicules.json` is the

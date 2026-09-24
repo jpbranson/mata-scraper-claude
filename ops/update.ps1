@@ -5,6 +5,10 @@
 $ErrorActionPreference = "Stop"
 $dir = (Resolve-Path "$PSScriptRoot\..").Path
 
+# The poller rebuilds routes.csv, stops.csv and network.geojson itself when
+# MATA renumbers its lines. Drop those local copies so the pull can't
+# conflict; if the pulled ones are stale, the poller rebuilds them again.
+git -C $dir checkout -- routes.csv stops.csv network.geojson
 git -C $dir pull --ff-only
 & "$dir\.venv\Scripts\python.exe" -m pip install -q -r "$dir\requirements.txt"
 

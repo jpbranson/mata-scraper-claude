@@ -9,7 +9,13 @@ captured) — poll that cheaply and only re-download /topo when it changes.
     python build_crosswalk.py --topo topo.json
     python build_crosswalk.py --fetch          # download it fresh
 
-Writes routes.csv, stops.csv and network.geojson next to the script.
+Writes routes.csv, stops.csv and network.geojson next to the script. The
+topo version they were built from is recorded in network.geojson
+(`topo_version`), so it travels with them through git.
+
+The poller runs this itself (`refresh`) when buses show up on line IDs
+routes.csv doesn't know, which is the sign that MATA renumbered them —
+every ID changed between topo versions 198238 and 198256, days apart.
 """
 
 from __future__ import annotations
@@ -24,10 +30,11 @@ import requests
 
 from cadavl_to_gtfs_rt import BASE, HEADERS
 
-ROUTES_CSV = Path("routes.csv")
-STOPS_CSV = Path("stops.csv")
-NETWORK_GEOJSON = Path("network.geojson")
-VERSION_PATH = Path("topo_version.txt")
+HERE = Path(__file__).parent
+ROUTES_CSV = HERE / "routes.csv"
+STOPS_CSV = HERE / "stops.csv"
+NETWORK_GEOJSON = HERE / "network.geojson"
+TOPO_PATH = HERE / "topo.json"
 
 
 def fetch_version(session: requests.Session) -> int:
@@ -73,14 +80,15 @@ def extract_stops(topo: dict) -> list[dict]:
     return rows
 
 
-def extract_network(topo: dict) -> dict:
+def extract_network(topo: dict, version: int | None) -> dict:
     """Route lines and stop points, for drawing the network on the map.
 
     Each line has several `itineraire`s (direction/branch variants) made of
     2-point `troncons` that overlap heavily between variants. Segments are
     emitted once per line as one MultiLineString, chained into runs while
     consecutive, and rounded to 5 decimals (~1 m). Stops are Points with
-    their name. Just under 1 MB for the whole network."""
+    their name and code (stable across renumberings, unlike the IDs). Just
+    under 1 MB for the whole network."""
     features = []
     for ligne in topo["topo"][0]["ligne"]:
         seen: set[int] = set()
@@ -115,11 +123,12 @@ def extract_network(topo: dict) -> dict:
             continue
         features.append({
             "type": "Feature",
-            "properties": {"stop": stop.get("nomCommercial")},
+            "properties": {"stop": stop.get("nomCommercial"),
+                           "code": stop.get("mnemoPointArret")},
             "geometry": {"type": "Point",
                          "coordinates": [round(loc["lng"], 5), round(loc["lat"], 5)]},
         })
-    return {"type": "FeatureCollection", "features": features}
+    return {"type": "FeatureCollection", "topo_version": version, "features": features}
 
 
 def write_csv(path: Path, rows: list[dict]) -> None:
@@ -128,6 +137,39 @@ def write_csv(path: Path, rows: list[dict]) -> None:
         writer.writeheader()
         writer.writerows(rows)
     print(f"wrote {path} ({len(rows)} rows)")
+
+
+def write_all(topo: dict, version: int | None) -> list[dict]:
+    routes = extract_routes(topo)
+    write_csv(ROUTES_CSV, routes)
+    write_csv(STOPS_CSV, extract_stops(topo))
+    NETWORK_GEOJSON.write_text(json.dumps(extract_network(topo, version), separators=(",", ":")))
+    print(f"wrote {NETWORK_GEOJSON} ({NETWORK_GEOJSON.stat().st_size // 1024} KB)")
+    return routes
+
+
+def download(session: requests.Session, version: int) -> dict:
+    print(f"topo version {version} — downloading (~28 MB, be patient)")
+    topo = fetch_topo(session)
+    TOPO_PATH.write_text(json.dumps(topo))
+    return topo
+
+
+def built_version() -> int | None:
+    try:
+        return json.loads(NETWORK_GEOJSON.read_text()).get("topo_version")
+    except (OSError, ValueError):
+        return None
+
+
+def refresh(session: requests.Session) -> bool:
+    """Rebuild everything if /config/version moved since the last build.
+    True if it did."""
+    version = fetch_version(session)
+    if version == built_version():
+        return False
+    write_all(download(session, version), version)
+    return True
 
 
 def main() -> None:
@@ -139,29 +181,19 @@ def main() -> None:
     if args.fetch:
         session = requests.Session()
         version = fetch_version(session)
-        print(f"topo version {version} — downloading (~28 MB, be patient)")
-        topo = fetch_topo(session)
-        Path("topo.json").write_text(json.dumps(topo))
-        VERSION_PATH.write_text(str(version))
+        topo = download(session, version)
     elif args.topo:
-        topo = json.loads(Path(args.topo).read_text())
+        topo, version = json.loads(Path(args.topo).read_text()), None
     else:
         ap.error("pass --topo PATH or --fetch")
 
-    routes = extract_routes(topo)
-    write_csv(ROUTES_CSV, routes)
-    write_csv(STOPS_CSV, extract_stops(topo))
-    NETWORK_GEOJSON.write_text(json.dumps(extract_network(topo), separators=(",", ":")))
-    print(f"wrote {NETWORK_GEOJSON} ({NETWORK_GEOJSON.stat().st_size // 1024} KB)")
+    routes = write_all(topo, version)
 
     print("\nroute crosswalk:")
     for r in routes:
         print(f"  {r['route_short_name']:>4} {r['route_long_name']:<26} "
               f"idLigne={r['line_internal_id']}")
 
-    print("\nNext: confirm route_short_name matches route_id (or route_short_name) "
-          "in routes.txt from GTFS_MATA.zip, and check whether stop_code "
-          "matches stop_code in stops.txt.")
 
 
 if __name__ == "__main__":

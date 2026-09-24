@@ -15,12 +15,12 @@
     --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
     --hairline: #a9a8a1; --ring: rgba(11,11,11,.10);
     --early: #2a78d6; --ontime: #898781; --late5: #fab219; --late10: #ec835a; --late20: #d03b3b;
-    --focus: #2a78d6;
+    --focus: #2a78d6; --stop: #6f6e69;
   }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
     color-scheme: dark;
     --surface: #1a1a19; --ink: #fff; --ink-2: #c3c2b7; --hairline: #4a4a47; --ring: rgba(255,255,255,.10);
-    --early: #3987e5; --focus: #3987e5;
+    --early: #3987e5; --focus: #3987e5; --stop: #d6d5cc;
   } }
   /* Minimum text size anywhere on the page is 12 pt = 16 px. */
   html, body, #map { height: 100%; margin: 0; background: var(--surface);
@@ -35,7 +35,28 @@
   #legend i { width: 14px; height: 14px; border-radius: 50%; flex: none; }
   #legend .sz i { background: var(--muted); }
   #legend .ghost i { background: none; border: 2px dashed var(--muted); }
-  #legend .stop i { width: 8px; height: 8px; background: var(--surface); border: 2px solid var(--hairline); }
+  #legend .stop i { width: 8px; height: 8px; background: var(--surface); border: 2px solid var(--stop); }
+
+  /* Stop panel: per route, the last and next scheduled trips at the stop. */
+  #stop { top: 124px; right: 14px; width: 380px; max-height: calc(100% - 300px); overflow: auto;
+    padding: 12px 16px 14px; }
+  #stop[hidden] { display: none; }
+  #stop h2 { font-size: 18px; font-weight: 600; margin: 0 36px 2px 0; }
+  #stop-x { position: absolute; top: 8px; right: 8px; font: 600 20px Inter, system-ui, sans-serif;
+    color: var(--ink-2); background: none; border: none; cursor: pointer; width: 36px; height: 36px; }
+  #stop .rt { margin-top: 14px; }
+  #stop .rt > div { display: flex; align-items: baseline; gap: 8px; color: var(--ink-2); }
+  #stop .chip { font-weight: 600; color: #fff; background: var(--focus); border-radius: 6px;
+    padding: 0 7px; flex: none; }
+  #stop table { width: 100%; border-collapse: collapse; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  #stop th { font-weight: 400; color: var(--muted); text-align: left; padding: 2px 0; }
+  #stop td { padding: 3px 0; }
+  #stop td:last-child, #stop th:last-child { text-align: right; }
+  #stop tr.now td { border-top: 1.5px solid var(--focus); padding: 0; height: 0; }
+  #stop .past { color: var(--ink-2); }
+  #stop .muted, #stop small { color: var(--muted); font-size: 16px; }
+  #stop .badge { display: inline-block; min-width: 3.2em; text-align: center; border-radius: 6px;
+    padding: 0 6px; font-weight: 600; color: #fff; }
 
   /* Timeline: play/pause, scrubber, clock, speed, LIVE, day. */
   #bar { bottom: 14px; left: 14px; right: 14px; display: flex; align-items: center; gap: 14px; padding: 10px 16px; }
@@ -52,6 +73,7 @@
   #clock.live i { display: block; }
   #clock.stale i { background: var(--late20); }
 
+  .leaflet-trails-pane canvas { pointer-events: none !important; }
   .bus { background: none; border: none; }
   .bus svg { overflow: visible; }
   .bus text { font: 600 16px Inter, system-ui, sans-serif; text-anchor: middle; }
@@ -69,6 +91,8 @@
     #bar { flex-wrap: wrap; gap: 10px; }
     #bar input[type=range] { flex: 1 1 100%; order: -1; }
     #legend { bottom: 172px; }
+    #stop { top: 14px; left: 14px; right: 14px; width: auto; max-height: 45vh; }
+    body.stop-open #legend { display: none; }
     .leaflet-bottom.leaflet-right { bottom: 158px; }
   }
   .leaflet-tile-pane { filter: grayscale(1) contrast(.85) opacity(.7); }
@@ -91,7 +115,12 @@
   <div><i style="background:var(--late20)"></i>20+ min late</div>
   <div class="sz"><i style="width:10px;height:10px"></i><i style="width:18px;height:18px"></i>&nbsp;size = load</div>
   <div class="ghost"><i></i>no GPS movement</div>
-  <div class="stop"><i></i>stop</div>
+  <div class="stop"><i></i>stop (click for times)</div>
+</div>
+<div id="stop" class="panel" hidden>
+  <button id="stop-x" title="close">&times;</button>
+  <h2 id="stop-name"></h2>
+  <div id="stop-body"></div>
 </div>
 <div id="bar" class="panel">
   <button id="play" title="play / pause">&#9654;</button>
@@ -102,11 +131,15 @@
   <input id="day" type="date">
 </div>
 <script>
-// Data: data/latest.json every 10 s (live), data/replay/<day>.jsonl once per
-// day viewed (one frame per 30 s, written by cadavl_to_gtfs_rt.py), and
-// network.geojson once (routes + stops, from build_crosswalk.py). Serve the
-// repo root over HTTP — fetch() won't work over file://.
+// Data: data/latest.json every 10 s (live, each bus with its recent trail),
+// data/replay/<day>.jsonl once per day viewed (one frame per 30 s, written by
+// cadavl_to_gtfs_rt.py), network.geojson once (routes + stops, from
+// build_crosswalk.py), and on clicking a stop that day's data/schedule/ and
+// data/arrivals/ files (schedule.py). Serve the repo root over HTTP —
+// fetch() won't work over file://.
 const POLL_MS = 10000, FRAME_S = 30, TRAIL_S = 300, GHOST_POLLS = 30, CAPACITY = 40;
+// Clock times read in Memphis time wherever the viewer is, like the timetable.
+const TZ = "America/Chicago";
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const dark = matchMedia("(prefers-color-scheme: dark)");
 const $ = (id) => document.getElementById(id);
@@ -114,8 +147,11 @@ const $ = (id) => document.getElementById(id);
 const map = L.map("map", { preferCanvas: true, zoomControl: false }).setView([35.12, -89.97], 12);
 L.control.zoom({ position: "bottomright" }).addTo(map);
 // Trails get their own pane so they always paint above the network and stops
-// (overlay pane is z 400, markers 600).
-map.createPane("trails").style.zIndex = 450;
+// (overlay pane is z 400, markers 600). Its canvas spans the whole map, so
+// it must let clicks and hovers through to the stops underneath.
+const trailPane = map.createPane("trails");
+trailPane.style.zIndex = 450;
+trailPane.style.pointerEvents = "none";
 // OSM tiles, muted by CSS (see .leaflet-tile-pane) so the data reads on top.
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19,
   attribution: "&copy; OpenStreetMap contributors" }).addTo(map);
@@ -124,7 +160,10 @@ L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19,
 function tier(v) {
   const d = v.delay_seconds;
   if (d == null) return "ontime";
-  if (v.delay_capped || d >= 1200) return "late20";
+  // "1h+" values are floors, early or late. Pollers before the parse fix
+  // stored them as 0, direction unknown: grey.
+  if (v.delay_capped) return d > 0 ? "late20" : d < 0 ? "early" : "ontime";
+  if (d >= 1200) return "late20";
   if (d >= 600) return "late10";
   if (d >= 300) return "late5";
   if (d <= -60) return "early";
@@ -135,42 +174,55 @@ function delayText(v) {
   const d = v.delay_seconds;
   if (v.delay_raw) return v.delay_raw;
   if (d == null) return "no delay data";
-  if (v.delay_capped) return d < 0 ? "1h+ early" : "1h+ late";
+  if (v.delay_capped) return d < 0 ? "1h+ early" : d > 0 ? "1h+ late" : "1h+ off schedule";
   const m = Math.round(Math.abs(d) / 60);
   return m === 0 ? "on time" : `${m} min ${d < 0 ? "early" : "late"}`;
 }
 
 // --- Network: route lines + stops ------------------------------------------
-let routes = null, stops = null, focusRoute = null;
-const routeStyle = (f) => f.properties.route_id === focusRoute
-  ? { color: css("--focus"), weight: 5, opacity: .9 }
-  : { color: css("--hairline"), weight: 2, opacity: focusRoute ? .35 : .8 };
+// focus: route numbers highlighted (a clicked bus's route, or every route
+// at a clicked stop); everything else dims.
+let routes = null, stops = null, focus = new Set(), stopMark = null;
+const routeStyle = (f) => focus.has(f.properties.route_id)
+  ? { color: css("--focus"), weight: 6, opacity: .9 }
+  : { color: css("--hairline"), weight: 2, opacity: focus.size ? .3 : .8 };
 // Stops only from zoom 13 in; city-wide they would just dot over the routes.
 const STOP_ZOOM = 13;
-const stopStyle = () => ({ radius: map.getZoom() >= 15 ? 4.5 : 3, color: css("--hairline"),
-  weight: 1.5, fillColor: css("--surface"), fillOpacity: 1, opacity: .9 });
+const stopStyle = () => ({ radius: map.getZoom() >= 15 ? 5.5 : 4, color: css("--stop"),
+  weight: 2, fillColor: css("--surface"), fillOpacity: 1, opacity: 1 });
 fetch("network.geojson").then(r => r.json()).then(gj => {
   routes = L.geoJSON(gj, { filter: f => f.geometry.type !== "Point", style: routeStyle,
     interactive: false }).addTo(map);
   stops = L.geoJSON(gj, { filter: f => f.geometry.type === "Point",
     pointToLayer: (f, ll) => L.circleMarker(ll, stopStyle())
-      .bindTooltip(f.properties.stop, { direction: "top", offset: [0, -6], opacity: 1 }) });
+      .bindTooltip(f.properties.stop, { direction: "top", offset: [0, -6], opacity: 1 })
+      .on("click", (e) => { L.DomEvent.stop(e); showStop(f.properties, ll); }) });
   routes.bringToBack();
   restyle();
 });
 function restyle() {
-  if (routes) routes.setStyle(routeStyle);
+  if (routes) {
+    routes.setStyle(routeStyle);
+    // Highlighted lines paint over the hairlines that share their streets.
+    routes.eachLayer(l => { if (focus.has(l.feature.properties.route_id)) l.bringToFront(); });
+  }
+  if (stopMark) stopMark.setStyle({ color: css("--focus") });
   if (!stops) return;
   stops.setStyle(stopStyle());
-  if (map.getZoom() >= STOP_ZOOM) { if (!map.hasLayer(stops)) stops.addTo(map); }
+  if (map.getZoom() >= STOP_ZOOM) { if (!map.hasLayer(stops)) stops.addTo(map); stops.bringToFront(); }
   else if (map.hasLayer(stops)) map.removeLayer(stops);
 }
 map.on("zoomend", restyle);
-map.on("click", () => setFocus(null));
+map.on("click", () => { closeStop(); setFocus([]); });
 dark.addEventListener("change", () => { restyle(); draw(); });
-function setFocus(routeId) {
-  focusRoute = routeId === focusRoute ? null : routeId;
-  if (routes) routes.setStyle(routeStyle);
+function setFocus(ids) {
+  focus = new Set(ids);
+  restyle(); draw();
+}
+// Clicking a bus highlights its route; clicking it again (or the map) clears.
+function focusBus(routeId) {
+  closeStop();
+  setFocus(focus.size === 1 && focus.has(routeId) ? [] : [routeId]);
 }
 
 // --- Timeline --------------------------------------------------------------
@@ -189,13 +241,22 @@ const fromLine = (line) => { const f = JSON.parse(line); return { t: f.t, v: f.v
 
 async function loadDay(day) {
   const r = await fetch(`data/replay/${day}.jsonl`, { cache: "no-store" });
-  frames = r.ok ? (await r.text()).split("\n").filter(Boolean).map(fromLine) : [];
+  const loaded = r.ok ? (await r.text()).split("\n").filter(Boolean).map(fromLine) : [];
+  if ($("day").value !== day) return;          // another day was picked meanwhile
+  frames = loaded;
   $("scrub").max = Math.max(frames.length - 1, 0);
 }
 function current() { return cursor == null ? live : frames[cursor]; }
-// Positions per bus over the TRAIL_S before frame `f` (plus f itself).
+// Positions per bus over the TRAIL_S before frame `f` (plus f itself). Live,
+// the poller sends each bus's last ten in latest.json, so trails are whole
+// the moment the page opens; replaying, they come from the frames.
 function trailsAt(f) {
-  const out = {}, end = cursor == null ? frames.length : cursor;
+  const out = {};
+  if (cursor == null && f.v.some(v => v.trail)) {
+    for (const v of f.v) out[v.vehicle_id] = [...(v.trail ?? []), [v.lat, v.lon]];
+    return out;
+  }
+  const end = cursor == null ? frames.length : cursor;
   for (let i = end - 1; i >= 0 && f.t - frames[i].t <= TRAIL_S; i--)
     for (const v of frames[i].v) (out[v.vehicle_id] ??= []).unshift([v.lat, v.lon]);
   for (const v of f.v) (out[v.vehicle_id] ??= []).push([v.lat, v.lon]);
@@ -261,14 +322,14 @@ function tip(v) {
 // oldest is darkened and faint.
 const shade = (hex, k) => "#" + [1, 3, 5].map(i =>
   Math.round(parseInt(hex.slice(i, i + 2), 16) * k).toString(16).padStart(2, "0")).join("");
-function drawTrail(group, pts, hex) {
+function drawTrail(group, pts, hex, dim) {
   group.clearLayers();
   const n = pts.length - 1;
   for (let i = 0; i < n; i++) {
     const age = 1 - (i + 1) / n;                 // 0 = newest, 1 = oldest
     group.addLayer(L.polyline([pts[i], pts[i + 1]], {
       color: shade(hex, 1 - .6 * age), weight: 5 - 2.5 * age,
-      opacity: .95 - .8 * age, lineCap: "round", interactive: false, pane: "trails" }));
+      opacity: (.95 - .8 * age) * dim, lineCap: "round", interactive: false, pane: "trails" }));
   }
 }
 
@@ -286,13 +347,15 @@ function draw() {
 
       const m = markers[v.vehicle_id] ??= L.marker(pos, { icon: icon(v) })
         .bindTooltip("", { direction: "top", offset: [0, -20], opacity: 1 })
-        .on("click", (e) => { L.DomEvent.stop(e); setFocus(m.routeId); })
+        .on("click", (e) => { L.DomEvent.stop(e); focusBus(m.routeId); })
         .addTo(map);
       m.routeId = v.route_id;
-      m.setLatLng(pos).setIcon(icon(v)).setZIndexOffset(RANK[t] * 1000).setTooltipContent(tip(v));
+      const dim = !focus.size || focus.has(v.route_id) ? 1 : .3;
+      m.setLatLng(pos).setIcon(icon(v)).setZIndexOffset(RANK[t] * 1000 + (dim < 1 ? -5000 : 0))
+        .setOpacity(dim).setTooltipContent(tip(v));
 
       const pts = tr[v.vehicle_id] ?? [];
-      if (pts.length > 1) drawTrail(trails[v.vehicle_id] ??= L.layerGroup().addTo(map), pts, css("--" + t));
+      if (pts.length > 1) drawTrail(trails[v.vehicle_id] ??= L.layerGroup().addTo(map), pts, css("--" + t), dim);
       else if (trails[v.vehicle_id]) trails[v.vehicle_id].clearLayers();
     }
   }
@@ -304,7 +367,7 @@ function draw() {
   $("n-bus").textContent = f ? f.v.length : "–";
   $("n-late").textContent = f ? late : "–";
   $("n-ride").textContent = f ? "~" + Math.round(riders) : "–";
-  $("clock-t").textContent = f ? new Date(f.t * 1000).toLocaleTimeString([], { timeStyle: "short" }) : "–";
+  $("clock-t").textContent = f ? new Date(f.t * 1000).toLocaleTimeString([], { timeStyle: "short", timeZone: TZ }) : "–";
   $("clock").classList.toggle("live", cursor == null);
   $("clock").classList.toggle("stale", cursor == null && !!f && Date.now() / 1000 - f.t > 90);
   $("play").innerHTML = playing ? "&#10074;&#10074;" : "&#9654;";
@@ -312,6 +375,101 @@ function draw() {
   $("live").classList.toggle("on", cursor == null);
   $("scrub").value = cursor == null ? frames.length - 1 : cursor;
   $("scrub").max = Math.max(frames.length - 1, 0);
+  renderStop();
+}
+
+// --- Stop panel ------------------------------------------------------------
+// Per route serving the stop: the last SHOW and next SHOW scheduled trips,
+// each with when its bus actually came or, live, when it's expected
+// (scheduled + the bus's current delay). The timetable is
+// data/schedule/<day>/ and the arrivals data/arrivals/<day>/, both written
+// by the poller (schedule.py); trips tie them together, and to live buses.
+const SHOW = 3, ARRIVALS_TTL = 30000;
+let stopOpen = null, stopRender = 0;
+const got = {};                // url -> { until, data } or { pending }
+// Fetch and parse, reusing the result for `ttl` ms (schedules are fixed for
+// the day). A missing file is retried after ARRIVALS_TTL: the poller may
+// not have written it yet.
+async function cached(url, ttl, lines) {
+  const c = got[url];
+  if (c?.pending) return c.pending;
+  if (c && Date.now() < c.until) return c.data;
+  const pending = fetch(url, { cache: "no-store" })
+    .then(r => !r.ok ? null : lines
+      ? r.text().then(t => t.split("\n").filter(Boolean).map(l => JSON.parse(l))) : r.json())
+    .catch(() => null);
+  got[url] = { pending };
+  const data = await pending;
+  got[url] = { until: Date.now() + (data == null ? ARRIVALS_TTL : ttl), data };
+  return data;
+}
+const hm = (t) => new Date(t * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: TZ });
+function badge(sec) {
+  const m = Math.round(sec / 60), t = tier({ delay_seconds: sec });
+  return `<span class="badge" style="background:var(--${t});${t === "late5" ? "color:#0b0b0b" : ""}">${m > 0 ? "+" : ""}${m === 0 ? "0" : m}</span>`;
+}
+
+async function showStop(p, ll) {
+  stopOpen = p;
+  (stopMark ??= L.circleMarker(ll, { radius: 11, weight: 3, fill: false, interactive: false }))
+    .setLatLng(ll).addTo(map);
+  $("stop-name").textContent = p.stop;
+  $("stop-body").innerHTML = `<p class="muted">Loading…</p>`;
+  $("stop").hidden = false;
+  document.body.classList.add("stop-open");
+  const idx = await cached(`data/schedule/${$("day").value}/stops.json`, Infinity);
+  if (stopOpen === p) setFocus(idx?.stops[p.code] ?? []);
+}
+function closeStop() {
+  stopOpen = null;
+  $("stop").hidden = true;
+  document.body.classList.remove("stop-open");
+  if (stopMark) map.removeLayer(stopMark);
+}
+$("stop-x").onclick = () => { closeStop(); setFocus([]); };
+
+async function renderStop() {
+  if (!stopOpen) return;
+  const p = stopOpen, token = ++stopRender, day = $("day").value, f = current();
+  const now = f ? f.t : Date.now() / 1000;
+  const idx = await cached(`data/schedule/${day}/stops.json`, Infinity);
+  const here = idx?.stops[p.code] ?? [];
+  // Live buses by the trip they're running (none when replaying).
+  const onTrip = {};
+  if (cursor == null && live) for (const v of live.v) if (v.trip_id) onTrip[v.trip_id] = v;
+  const parts = await Promise.all(here.map(async (route) => {
+    const [sch, arr] = await Promise.all([
+      cached(`data/schedule/${day}/${route}.json`, Infinity),
+      cached(`data/arrivals/${day}/${route}.jsonl`, ARRIVALS_TTL, true)]);
+    if (!sch) return "";
+    const came = {}, rows = [];
+    for (const a of arr ?? []) if (a.stop === p.code && a.t <= now) {
+      if (a.trip) came[a.trip] = a; else rows.push({ at: a.t, past: true });
+    }
+    const heads = new Set();
+    for (const [s, i] of sch.stops[p.code] ?? []) {
+      const [trip, head] = sch.trips[i], due = sch.t0 + s, a = came[trip], v = onTrip[trip];
+      heads.add(head.trim());
+      if (a) rows.push({ due, at: a.t, past: true });
+      else if (v && v.delay_seconds != null) rows.push({ due, at: due + v.delay_seconds, expected: true });
+      else rows.push({ due, past: due < now });
+    }
+    const when = (r) => r.at ?? r.due;
+    rows.sort((a, b) => when(a) - when(b));
+    const past = rows.filter(r => r.past).slice(-SHOW), next = rows.filter(r => !r.past).slice(0, SHOW);
+    const td = (r) => `<td>${r.due ? hm(r.due) : "<small>unscheduled</small>"}</td>` +
+      (r.at == null ? `<td class="muted">${r.past ? "not seen" : ""}</td><td></td>`
+        : `<td>${r.expected ? "~" : ""}${hm(r.at)}</td><td>${r.due ? badge(r.at - r.due) : ""}</td>`);
+    return `<div class="rt"><div><span class="chip">${route}</span><span>to ${[...heads].join(" / ")}</span></div>
+      <table><tr><th>Scheduled</th><th>Arrived / expected</th><th>min</th></tr>
+      ${past.map(r => `<tr class="past">${td(r)}</tr>`).join("")}
+      <tr class="now"><td colspan="3"></td></tr>
+      ${next.map(r => `<tr>${td(r)}</tr>`).join("") || `<tr><td colspan="3" class="muted">no more trips today</td></tr>`}
+      </table></div>`;
+  }));
+  if (token !== stopRender || stopOpen !== p) return;   // a newer render won
+  $("stop-body").innerHTML = parts.join("") ||
+    `<p class="muted">${idx ? "No scheduled service here on this day." : "No timetable for this day yet."}</p>`;
 }
 
 // --- Live ------------------------------------------------------------------
@@ -323,9 +481,11 @@ async function refresh() {
   live = { t: fetched_at, v: vehicles };
   // First load, or the service day rolled over while watching live: load
   // that day's frames.
+  // The replay file can be several MB by evening; the live view (trails
+  // included) doesn't wait for it.
   if (day !== serverDay && (serverDay == null || cursor == null)) {
-    serverDay = day; $("day").value = day;
-    await loadDay(day);
+    serverDay = day; $("day").value = day; frames = [];
+    loadDay(day).then(() => { if (cursor == null) draw(); });
   }
   // Extend today's timeline at the file's cadence so trails keep growing
   // between page loads and the scrubber reaches "now".

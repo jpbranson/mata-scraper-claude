@@ -1,17 +1,22 @@
 """
-Rebuild replay frames from the full position history.
+Rebuild replay frames and stop arrivals from the full position history.
 
-The poller writes data/replay/<day>.jsonl as it goes, but only while it is
-running the current code. This regenerates those files from
-data/positions/ (one row per bus per 10 s), one frame per 30 s, so any
-recorded day can be replayed in map.html.
+The poller writes data/replay/<day>.jsonl and data/arrivals/<day>/ as it
+goes, but only while it is running the current code. This regenerates
+them from data/positions/ (one row per bus per 10 s), one frame per 30 s,
+so any recorded day can be replayed in map.html and its stops show when
+buses came.
 
     python backfill_replay.py                # every day in data/positions/
     python backfill_replay.py 2026-09-24     # one day (local date)
 
-Replay files for the days touched are rewritten from scratch. Stop the
-poller first if you rebuild today, or its next frame will land in the
-rebuilt file out of order (harmless for the map, but untidy).
+On the way it repairs two things older pollers got wrong: rows on lines
+routes.csv didn't know yet (`cadavl:<id>`, mapped with today's routes.csv
+where the ID is in it) and "1h+" delays, which were stored as 0.
+
+Files for the days touched are rewritten from scratch. Stop the poller
+first if you rebuild today, or its next writes will land in the rebuilt
+files out of order.
 """
 
 from __future__ import annotations
@@ -19,9 +24,13 @@ from __future__ import annotations
 import gzip
 import json
 import sys
-from datetime import datetime
+from datetime import date, datetime
 
-from cadavl_to_gtfs_rt import OUT_DIR, POLL_SECONDS, REPLAY_EVERY, replay_frame, replay_path
+import requests
+
+from cadavl_to_gtfs_rt import (OUT_DIR, POLL_SECONDS, REPLAY_EVERY, ROUTES, parse_delay,
+                               replay_frame, replay_path)
+from schedule import GTFS_PATH, Arrivals, Timetable, append_arrivals, fetch_gtfs
 
 FRAME_S = POLL_SECONDS * REPLAY_EVERY
 
@@ -31,18 +40,28 @@ def main(only_day: str | None) -> None:
     if not files:
         sys.exit(f"no history under {OUT_DIR / 'positions'}")
 
+    if not GTFS_PATH.exists():
+        fetch_gtfs(requests.Session())
     written: dict[str, int] = {}
+    arrived: dict[str, list] = {}
+    detector = Arrivals()
+    timetable = None
     open_paths = set()
     poll: list[dict] = []
     poll_t = None
     last_bin = None
 
     def flush() -> None:
-        nonlocal last_bin
-        if not poll or poll_t // FRAME_S == last_bin:
+        nonlocal last_bin, timetable
+        if not poll:
             return
         day = datetime.fromtimestamp(poll_t).strftime("%Y-%m-%d")
         if only_day and day != only_day:
+            return
+        if timetable is None or timetable.day.isoformat() != day:
+            timetable = Timetable(GTFS_PATH, date.fromisoformat(day))
+        arrived.setdefault(day, []).extend(detector.update(timetable, poll))
+        if poll_t // FRAME_S == last_bin:
             return
         path = replay_path(poll_t)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -62,9 +81,16 @@ def main(only_day: str | None) -> None:
                     flush()
                     poll, poll_t = [], r["observed_at"]
                 r.setdefault("unchanged_polls", 0)
+                if r["route_id"].startswith("cadavl:") and r.get("line_internal_id") in ROUTES:
+                    r["route_id"] = ROUTES[r["line_internal_id"]]["route_id"]
+                if r.get("delay_raw"):
+                    r["delay_seconds"], r["delay_capped"] = parse_delay(r["delay_raw"])
                 poll.append(r)
     flush()
 
+    for day, found in sorted(arrived.items()):
+        append_arrivals(found, mode="w")
+        print(f"{day}: {len(found)} arrivals -> {OUT_DIR / 'arrivals' / day}")
     for day, n in sorted(written.items()):
         print(f"{day}: {n} frames -> {OUT_DIR / 'replay' / (day + '.jsonl')}")
     if not written:

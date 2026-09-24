@@ -18,11 +18,14 @@ import gzip
 import json
 import re
 import time
+from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
 from google.transit import gtfs_realtime_pb2
+
+from schedule import Schedule
 
 # --------------------------------------------------------------------------
 # Config
@@ -34,6 +37,8 @@ BASE = "https://swiv.mata.cadavl.com/SWIV/MATA/proxy/restWS"
 # 10.000 s apart. Server latency was 0.9-3.4 s, so keep timeouts above that.
 POLL_SECONDS = 10
 REPLAY_EVERY = 3            # one replay frame per 30 s
+TRAIL_POINTS = 10           # replay positions per bus sent in latest.json
+TOPO_CHECK_SECONDS = 900    # at most this often, while lines are unmapped
 SERVICE_HOURS = (4, 24)
 HERE = Path(__file__).parent
 OUT_DIR = HERE / "data"
@@ -108,7 +113,9 @@ def fetch_vehicles(session: requests.Session) -> dict:
 # Normalization
 # --------------------------------------------------------------------------
 
-_DELAY_RE = re.compile(r"(?:(\d+)\s*h)?\s*(?:(\d+)\s*min)?\s*(late|early)", re.I)
+# The "+" after "1h" must be allowed for, or the hours are skipped and
+# "1h+ early" parses as 0 s.
+_DELAY_RE = re.compile(r"(?:(\d+)\s*h\+?)?\s*(?:(\d+)\s*min)?\s*(late|early)", re.I)
 
 
 def parse_delay(text: str | None) -> tuple[int | None, bool]:
@@ -256,12 +263,13 @@ def write_atomic(path: Path, data: bytes) -> None:
     tmp.replace(path)
 
 
-def write_latest(rows: list[dict], fetched_at: int) -> None:
+def write_latest(rows: list[dict], fetched_at: int, trails: Trails) -> None:
     """Current snapshot for map.html and the "right now" query. `day` is the
-    poller's local service day, which names the replay file."""
+    poller's local service day, which names the replay file. Each bus
+    carries its `trail` so the map can draw it without the replay file."""
     write_atomic(LATEST_PATH, json.dumps(
         {"fetched_at": fetched_at, "day": datetime.fromtimestamp(fetched_at).strftime("%Y-%m-%d"),
-         "vehicles": rows}).encode())
+         "vehicles": [{**r, "trail": trails.get(r["vehicle_id"])} for r in rows]}).encode())
 
 
 def replay_path(t: int) -> Path:
@@ -286,6 +294,34 @@ def write_replay_frame(rows: list[dict], fetched_at: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as fh:
         fh.write(replay_frame(rows, fetched_at))
+
+
+class Trails:
+    """Each bus's last TRAIL_POINTS replay positions (one per 30 s), kept in
+    memory and seeded from today's replay file on startup, so a restart
+    doesn't blank the trails either."""
+
+    def __init__(self) -> None:
+        self._pts: dict[str, deque] = {}
+        path = replay_path(int(time.time()))
+        if path.exists():
+            with path.open(encoding="utf-8") as fh:
+                tail = deque(fh, maxlen=TRAIL_POINTS)
+            for line in tail:
+                f = json.loads(line)
+                if time.time() - f["t"] < TRAIL_POINTS * POLL_SECONDS * REPLAY_EVERY:
+                    for v in f["v"]:
+                        self._add(v[0], v[2], v[3])
+
+    def _add(self, vid: str, lat: float, lon: float) -> None:
+        self._pts.setdefault(vid, deque(maxlen=TRAIL_POINTS)).append([lat, lon])
+
+    def add(self, rows: list[dict]) -> None:
+        for r in rows:
+            self._add(r["vehicle_id"], round(r["lat"], 5), round(r["lon"], 5))
+
+    def get(self, vid: str) -> list:
+        return list(self._pts.get(vid, ()))
 
 
 def archive_positions(rows: list[dict], fetched_at: int) -> None:
@@ -320,10 +356,29 @@ def run_sample(path: str) -> None:
               f"{sorted(unmapped)} — rebuild routes.csv")
 
 
+def refresh_crosswalk(session: requests.Session) -> bool:
+    """MATA renumbers every line now and then; when buses show up on unknown
+    lines and /config/version has moved, rebuild routes.csv, stops.csv and
+    network.geojson (~28 MB download) and reload. True if rebuilt."""
+    global ROUTES
+    import build_crosswalk      # imports this module; avoid the cycle at load
+    try:
+        if not build_crosswalk.refresh(session):
+            return False
+    except (requests.RequestException, ValueError) as exc:
+        print(f"crosswalk refresh failed: {exc}")
+        return False
+    ROUTES = load_routes()
+    return True
+
+
 def run_poller() -> None:
     session = requests.Session()
     stale = StaleTracker()
+    trails = Trails()
+    schedule = Schedule()
     polls = 0
+    topo_checked = 0
 
     while True:
         if not SERVICE_HOURS[0] <= datetime.now().hour < SERVICE_HOURS[1]:
@@ -335,14 +390,26 @@ def run_poller() -> None:
             payload = fetch_vehicles(session)
             rows = [r for r in (normalize_vehicle(v, fetched_at)
                                 for v in iter_raw_vehicles(payload)) if r]
+            if (any(r["route_id"].startswith("cadavl:") for r in rows)
+                    and fetched_at - topo_checked > TOPO_CHECK_SECONDS):
+                topo_checked = fetched_at
+                if refresh_crosswalk(session):
+                    schedule.reload_stops()
+                    rows = [r for r in (normalize_vehicle(v, fetched_at)
+                                        for v in iter_raw_vehicles(payload)) if r]
             for r in rows:
                 r["unchanged_polls"] = stale.update(r)
+            try:
+                schedule.update(session, rows, fetched_at)
+            except Exception as exc:    # the timetable is extra; never lose a poll to it
+                print(f"schedule update failed: {exc!r}")
 
             archive_positions(rows, fetched_at)
-            write_latest(rows, fetched_at)
             polls += 1
             if polls % REPLAY_EVERY == 1:
                 write_replay_frame(rows, fetched_at)
+                trails.add(rows)
+            write_latest(rows, fetched_at, trails)
             write_atomic(FEED_PATH, build_feed(rows, fetched_at).SerializeToString())
             print(f"{len(rows)} vehicles, "
                   f"{sum(r['unchanged_polls'] == 0 for r in rows)} moved")
