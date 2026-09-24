@@ -9,7 +9,7 @@ captured) — poll that cheaply and only re-download /topo when it changes.
     python build_crosswalk.py --topo topo.json
     python build_crosswalk.py --fetch          # download it fresh
 
-Writes routes.csv and stops.csv next to the script.
+Writes routes.csv, stops.csv and shapes.geojson next to the script.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ from cadavl_to_gtfs_rt import BASE, HEADERS
 
 ROUTES_CSV = Path("routes.csv")
 STOPS_CSV = Path("stops.csv")
+SHAPES_GEOJSON = Path("shapes.geojson")
 VERSION_PATH = Path("topo_version.txt")
 
 
@@ -72,6 +73,44 @@ def extract_stops(topo: dict) -> list[dict]:
     return rows
 
 
+def extract_shapes(topo: dict) -> dict:
+    """One MultiLineString per line, for drawing the network on the map.
+
+    Each line has several `itineraire`s (direction/branch variants) made of
+    2-point `troncons` that overlap heavily between variants. Segments are
+    emitted once per line, chained into runs while consecutive, and rounded
+    to 5 decimals (~1 m). About 400 KB for the whole network."""
+    features = []
+    for ligne in topo["topo"][0]["ligne"]:
+        seen: set[int] = set()
+        parts: list[list[list[float]]] = []
+        for itin in ligne["itineraire"]:
+            run: list[list[float]] = []
+            for seg in itin["troncons"]:
+                if seg["idTroncon"] in seen:
+                    if len(run) > 1:
+                        parts.append(run)
+                    run = []
+                    continue
+                seen.add(seg["idTroncon"])
+                a = [round(seg["debut"]["lng"], 5), round(seg["debut"]["lat"], 5)]
+                b = [round(seg["fin"]["lng"], 5), round(seg["fin"]["lat"], 5)]
+                if not run or run[-1] != a:
+                    if len(run) > 1:
+                        parts.append(run)
+                    run = [a]
+                run.append(b)
+            if len(run) > 1:
+                parts.append(run)
+        features.append({
+            "type": "Feature",
+            "properties": {"route_id": ligne["nomCommercial"],
+                           "name": ligne["libCommercial"]},
+            "geometry": {"type": "MultiLineString", "coordinates": parts},
+        })
+    return {"type": "FeatureCollection", "features": features}
+
+
 def write_csv(path: Path, rows: list[dict]) -> None:
     with path.open("w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=list(rows[0]))
@@ -101,6 +140,8 @@ def main() -> None:
     routes = extract_routes(topo)
     write_csv(ROUTES_CSV, routes)
     write_csv(STOPS_CSV, extract_stops(topo))
+    SHAPES_GEOJSON.write_text(json.dumps(extract_shapes(topo), separators=(",", ":")))
+    print(f"wrote {SHAPES_GEOJSON} ({SHAPES_GEOJSON.stat().st_size // 1024} KB)")
 
     print("\nroute crosswalk:")
     for r in routes:

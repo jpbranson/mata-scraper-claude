@@ -89,8 +89,9 @@ days to Parquet with one DuckDB `COPY` — not now.
 
 **Snapshot — `data/latest.json`.** The same rows for the current poll plus
 `fetched_at`, written atomically (tmp file + rename). The map reads this; so
-does the "right now" query. Rows include `route_color` so the page needs no
-second lookup.
+does the "right now" query. Each row also carries `trail`, the bus's last 30
+positions (five minutes), kept in memory by the poller for the map only —
+history rows don't have it.
 
 **GTFS-RT — `data/vehicle_positions.pb`.** Already implemented; ~30 lines and
 one dependency. Kept because it is the standard interchange format, but
@@ -106,24 +107,46 @@ Small cleanups to make while touching the file:
 
 ### 2. Crosswalk — `build_crosswalk.py`
 
-Unchanged. Run `python build_crosswalk.py --fetch` when the poller starts
-logging `route_id = cadavl:<n>` (an unmapped line), which is the signal that
-`/config/version` bumped. Commit the resulting CSVs. No scheduler needed;
-MATA restructures a few times a year.
+Run `python build_crosswalk.py --fetch` when the poller starts logging
+`route_id = cadavl:<n>` (an unmapped line), which is the signal that
+`/config/version` bumped. Commit the results. No scheduler needed; MATA
+restructures a few times a year (every line ID changed between August and
+September 2026).
 
-### 3. Live map — `map.html` (new)
+Besides `routes.csv` and `stops.csv` it writes `shapes.geojson`: one
+MultiLineString per route, built from the 2-point segments in `/topo`,
+de-duplicated across a route's direction/branch variants and rounded to 5
+decimals. ~400 KB for the whole network; the map draws it as the background.
 
-One static page, ~60 lines: Leaflet from a CDN, `fetch("data/latest.json")`
-on a 10 s timer, a circle marker per bus colored by route, popup with route,
-headsign, delay, load, and how stale the fix is (`unchanged_polls`). Ghosts
-(`unchanged_polls` above ~30, i.e. five minutes) drawn hollow.
+### 3. Live map — `map.html`
+
+One static page, Leaflet from a CDN, no build step. It fetches
+`data/latest.json` every 10 s and `shapes.geojson` once. Visual-first: the
+picture carries the information and text is confined to a tooltip and a
+three-number strip.
+
+Encodings, per bus:
+
+- **Fill = schedule adherence**, in tiers: early (blue), on time (grey, so
+  problems stand out), 5+ / 10+ / 20+ min late (yellow → orange → red, the
+  status palette). `"1h+"` capped values count as 20+.
+- **Size = passenger load** (`occupancy_pct`), radius 9–16 px.
+- **Number = route**, a wedge on the rim = heading.
+- **Trail** = last five minutes of positions, in the same tier color.
+- **Ghost** (`unchanged_polls` ≥ 30) = dashed hollow circle, no wedge.
+- Late buses are stacked on top of on-time ones.
+
+Around it: the whole network as hairlines; click a bus and its route
+highlights while the rest dims (click the map to clear). Hover for route,
+headsign, delay text, load, fleet number. Top-right: buses in service, buses
+5+ min late, estimated riders (`CAPACITY = 40`). A dot goes red when the
+snapshot is older than 90 s. Bottom-left legend. The OSM basemap is muted
+with a CSS filter so the data reads on top; dark mode inverts it and follows
+the OS setting.
 
 Served by `python -m http.server` from the repo root — browsers block
 `fetch()` on `file://` URLs, so a server is required, but that one command
 is all of it.
-
-This replaces `plot_bus_map.py` and the committed `bus_map.html`. Historical
-trails, if ever wanted, come from a DuckDB query, not from the poller.
 
 ### 4. Analysis — `analysis.sql` (new)
 
@@ -254,8 +277,9 @@ router ports opened and nothing exposed to the internet. Don't port-forward
 Analysis on Windows: download the DuckDB CLI (`duckdb.exe`, a single file)
 and run `Get-Content analysis.sql | .\duckdb.exe` from the repo folder.
 
-Git tracks code, the crosswalk CSVs, `vehicules.json` (the sample payload
-for `--sample`), and this document. `data/` and generated HTML are ignored.
+Git tracks code, the crosswalk outputs (`routes.csv`, `stops.csv`,
+`shapes.geojson`), `vehicules.json` (the sample payload for `--sample`), and
+this document. `data/` and the raw `topo.json` are ignored.
 
 Failure modes and the response to each:
 

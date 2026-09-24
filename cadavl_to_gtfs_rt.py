@@ -18,6 +18,7 @@ import gzip
 import json
 import re
 import time
+from collections import defaultdict, deque
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -33,6 +34,7 @@ BASE = "https://swiv.mata.cadavl.com/SWIV/MATA/proxy/restWS"
 # Measured from the tracker's own traffic: consecutive vehicules requests
 # 10.000 s apart. Server latency was 0.9-3.4 s, so keep timeouts above that.
 POLL_SECONDS = 10
+TRAIL_POLLS = 30            # 5 minutes of positions per bus in latest.json
 SERVICE_HOURS = (4, 24)
 HERE = Path(__file__).parent
 OUT_DIR = HERE / "data"
@@ -296,6 +298,8 @@ def run_sample(path: str) -> None:
 def run_poller() -> None:
     session = requests.Session()
     stale = StaleTracker()
+    # Last TRAIL_POLLS positions per vehicle, for the map only (not history).
+    trails: dict[str, deque] = defaultdict(lambda: deque(maxlen=TRAIL_POLLS))
 
     while True:
         if not SERVICE_HOURS[0] <= datetime.now().hour < SERVICE_HOURS[1]:
@@ -311,6 +315,9 @@ def run_poller() -> None:
                 r["unchanged_polls"] = stale.update(r)
 
             archive_positions(rows, fetched_at)
+            for r in rows:
+                trails[r["vehicle_id"]].append([r["lat"], r["lon"]])
+                r["trail"] = list(trails[r["vehicle_id"]])
             write_latest(rows, fetched_at)
             write_atomic(FEED_PATH, build_feed(rows, fetched_at).SerializeToString())
             print(f"{len(rows)} vehicles, "
