@@ -31,6 +31,15 @@ if (-not $python) {
     throw "Python 3.10+ not found. Install it from https://www.python.org/downloads/ (tick 'Add python.exe to PATH'), open a new PowerShell, and re-run."
 }
 
+# On a re-run, stop the tasks first: their python.exe is locked while running,
+# so `venv` can't refresh it. Stopping mata-poller also leaves the python
+# under its cmd.exe wrapper alive, holding poller.log open so the new task
+# exits 1 (same as in update.ps1); kill that too.
+Get-ScheduledTask mata-* -ErrorAction SilentlyContinue | Stop-ScheduledTask
+Get-CimInstance Win32_Process -Filter "Name='python.exe' AND CommandLine LIKE '%cadavl_to_gtfs_rt.py%'" |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+Start-Sleep 1
+
 & $python -m venv "$dir\.venv"
 if (-not (Test-Path $py)) { throw "venv creation failed; see output above." }
 & $py -m pip install -q -r "$dir\requirements.txt"
