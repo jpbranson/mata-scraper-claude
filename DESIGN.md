@@ -84,9 +84,11 @@ when something changed. The simpler model wins on every axis:
 - The raw archive and the dedupe set (`seen`, `position_key`) are deleted —
   the normalized row already keeps every field the vendor sends.
 
-Cost: ~40 buses × 8,640 polls/day ≈ 350k rows/day, roughly 10–15 MB/day
-gzipped, ~5 GB/year. Acceptable on any disk. If it ever matters, compact old
-days to Parquet with one DuckDB `COPY` — not now.
+Cost (measured): 68 B per bus-poll gzipped, so a 30-bus average over the
+20-hour service day is ~18 MB/day and a full 41-bus day ~24 MB; call it
+6–9 GB/year. The replay frames add ~5–7 MB/day (~2 GB/year) and the log
+~0.3 MB/day. Acceptable on any disk. If it ever matters, compact old days to
+Parquet with one DuckDB `COPY` — not now.
 
 **Snapshot — `data/latest.json`.** The same rows for the current poll plus
 `fetched_at`, written atomically (tmp file + rename). The map reads this; so
@@ -94,8 +96,8 @@ does the "right now" query.
 
 **Replay — `data/replay/<local day>.jsonl`.** Every third poll (30 s) one
 compact line: the poll time and, per bus, `[id, route, lat, lon, bearing,
-delay_seconds, delay_capped, occupancy_pct, unchanged_polls]`. About 8 MB
-for a full day. The map loads the viewed day's file once; it drives both the
+delay_seconds, delay_capped, occupancy_pct, unchanged_polls]`. 59 B per bus
+per frame, ~5–7 MB for a full day. The map loads the viewed day's file once; it drives both the
 replay scrubber and the trails (so trails are there the moment the page
 opens, not five minutes after the poller starts).
 
