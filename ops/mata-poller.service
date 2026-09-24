@@ -1,5 +1,4 @@
-# Copy to /etc/systemd/system/, edit the two paths, then:
-#   systemctl enable --now mata-poller
+# Installed by ops/setup.sh (which also adds User=). Paths assume /opt/mata-scraper-claude.
 [Unit]
 Description=MATA bus position poller
 After=network-online.target

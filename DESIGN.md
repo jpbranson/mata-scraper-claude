@@ -217,19 +217,32 @@ queries rather than renaming partitions).
 
 ## Running it
 
-One always-on machine (Raspberry Pi, small VPS, spare laptop). Two systemd
-units, both `Restart=always`, both with `Environment=TZ=America/Chicago` so
-the service-hours check and log timestamps are local:
+One always-on machine at home (Raspberry Pi, old laptop, mini PC) running
+Debian or Ubuntu. Chosen over the cloud free tiers: Google's e2-micro is
+free but its external IP is ~$3.65/month, Oracle's is $0 but has signup
+and idle-reclamation caveats, and a home box costs a few dollars a year in
+power. Needs are tiny: one 12 KB request every 10 s, ~15 MB/day of disk.
 
-- `ops/mata-poller.service` — `python cadavl_to_gtfs_rt.py` in the repo dir.
-- `ops/mata-web.service` — `python -m http.server 8000` in the repo dir;
-  the map is then at `http://<host>:8000/map.html`.
+Install with `ops/setup.sh` (run as a sudo-capable user on the machine):
+it installs git and Python, clones to `/opt/mata-scraper-claude`, makes a
+venv from `requirements.txt` (`requests`, `gtfs-realtime-bindings`,
+`duckdb`), and installs two systemd units as your user, both
+`Restart=always`:
 
-Copy both to `/etc/systemd/system/`, edit the paths, `systemctl enable --now`
-each.
+- `ops/mata-poller.service` — `python cadavl_to_gtfs_rt.py`, with
+  `Environment=TZ=America/Chicago` so the service-hours check is local. On
+  a UTC host without it, the poller sleeps every evening.
+- `ops/mata-web.service` — `python -m http.server 8000`; the map is at
+  `http://<host>:8000/map.html`.
 
-Dependencies (`requirements.txt`): `requests`, `gtfs-realtime-bindings`,
-`duckdb`. Setup is `python -m venv .venv && pip install -r requirements.txt`.
+Reaching the map away from home: install Tailscale (free for personal use)
+on the machine and your phone. It makes a private network between your own
+devices, so the same URL works anywhere with no router ports opened and
+nothing exposed to the internet. Don't port-forward 8000 instead;
+`http.server` is not meant to face the public internet.
+
+Laptop specifics: disable sleep on lid close (`HandleLidSwitch=ignore` in
+`/etc/systemd/logind.conf`), and keep it plugged in.
 
 Git tracks code, the crosswalk CSVs, `vehicules.json` (the sample payload
 for `--sample`), and this document. `data/` and generated HTML are ignored.
