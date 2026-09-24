@@ -64,6 +64,13 @@
   .leaflet-container { background: var(--surface); font: 16px Inter, system-ui, sans-serif; }
   .leaflet-control-attribution { font-size: 16px; }
   .leaflet-bottom.leaflet-right { bottom: 78px; }
+  /* Phones: scrubber on its own row, legend tucked up out of the bar's way. */
+  @media (max-width: 720px) {
+    #bar { flex-wrap: wrap; gap: 10px; }
+    #bar input[type=range] { flex: 1 1 100%; order: -1; }
+    #legend { bottom: 172px; }
+    .leaflet-bottom.leaflet-right { bottom: 158px; }
+  }
   .leaflet-tile-pane { filter: grayscale(1) contrast(.85) opacity(.7); }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .leaflet-tile-pane {
     filter: invert(1) grayscale(1) brightness(.75) contrast(1.1); } }
@@ -310,7 +317,9 @@ function draw() {
 // --- Live ------------------------------------------------------------------
 async function refresh() {
   const resp = await fetch("data/latest.json", { cache: "no-store" });
-  const { fetched_at, day, vehicles } = await resp.json();
+  const j = await resp.json(), fetched_at = j.fetched_at, vehicles = j.vehicles;
+  // Older pollers don't report their day; fall back to the viewer's date.
+  const day = j.day ?? new Date(fetched_at * 1000).toLocaleDateString("en-CA");
   live = { t: fetched_at, v: vehicles };
   // First load, or the service day rolled over while watching live: load
   // that day's frames.

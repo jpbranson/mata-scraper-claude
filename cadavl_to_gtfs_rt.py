@@ -264,19 +264,28 @@ def write_latest(rows: list[dict], fetched_at: int) -> None:
          "vehicles": rows}).encode())
 
 
-def write_replay_frame(rows: list[dict], fetched_at: int) -> None:
-    """Compact frame for map.html's replay: one line per REPLAY_EVERY polls,
-    one file per local service day, ~8 MB/day. The page builds trails from
-    these too, so they show the moment it opens."""
-    day = datetime.fromtimestamp(fetched_at).strftime("%Y-%m-%d")  # local date
-    path = OUT_DIR / f"replay/{day}.jsonl"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    frame = {"t": fetched_at, "v": [
+def replay_path(t: int) -> Path:
+    """One replay file per local service day."""
+    return OUT_DIR / f"replay/{datetime.fromtimestamp(t).strftime('%Y-%m-%d')}.jsonl"
+
+
+def replay_frame(rows: list[dict], t: int) -> str:
+    """Compact frame for map.html's replay, one line: the poll time and, per
+    bus, the fields the map needs. ~59 bytes per bus."""
+    return json.dumps({"t": t, "v": [
         [r["vehicle_id"], r["route_id"], round(r["lat"], 5), round(r["lon"], 5),
          r["bearing"], r["delay_seconds"], r["delay_capped"], r["occupancy_pct"],
-         r["unchanged_polls"]] for r in rows]}
+         r["unchanged_polls"]] for r in rows]}, separators=(",", ":")) + "\n"
+
+
+def write_replay_frame(rows: list[dict], fetched_at: int) -> None:
+    """One frame per REPLAY_EVERY polls (~5-7 MB/day). The page builds trails
+    from these too, so they show the moment it opens. backfill_replay.py
+    rebuilds a day's file from the full history if this ever has gaps."""
+    path = replay_path(fetched_at)
+    path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(frame, separators=(",", ":")) + "\n")
+        fh.write(replay_frame(rows, fetched_at))
 
 
 def archive_positions(rows: list[dict], fetched_at: int) -> None:

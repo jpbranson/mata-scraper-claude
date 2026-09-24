@@ -97,7 +97,9 @@ does the "right now" query.
 **Replay — `data/replay/<local day>.jsonl`.** Every third poll (30 s) one
 compact line: the poll time and, per bus, `[id, route, lat, lon, bearing,
 delay_seconds, delay_capped, occupancy_pct, unchanged_polls]`. 59 B per bus
-per frame, ~5–7 MB for a full day. The map loads the viewed day's file once; it drives both the
+per frame, ~5–7 MB for a full day. `python backfill_replay.py [day]` rebuilds
+these from the full history — for days recorded before this existed, or
+after any gap. The map loads the viewed day's file once; it drives both the
 replay scrubber and the trails (so trails are there the moment the page
 opens, not five minutes after the poller starts).
 
