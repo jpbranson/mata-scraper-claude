@@ -291,11 +291,16 @@ The machine's clock is already Central time, so the service-hours check
 needs no time-zone setting. Do set Power settings to never sleep (and, on
 a laptop, "do nothing" on lid close, plugged in).
 
-Reaching the map away from home: install Tailscale (free for personal use)
-on the machine and your phone. It makes a private network between your own
-devices, so `http://<machine-name>:8000/map.html` works anywhere with no
-router ports opened and nothing exposed to the internet. Don't port-forward
-8000 instead; `http.server` is not meant to face the public internet.
+Reaching the map away from home: Tailscale (free for personal use) on the
+machine and the phone makes a private network between your own devices,
+with no router ports opened and nothing exposed to the internet. Phone
+browsers force `https://`, which plain `http.server` can't answer
+(`ERR_SSL_PROTOCOL_ERROR`), so let Tailscale terminate HTTPS: enable
+MagicDNS and HTTPS in the admin console (DNS page), then on the PC run
+`tailscale serve --bg 8000` once. The map is then at
+`https://<pc-name>.<tailnet>.ts.net/map.html` from any signed-in device.
+Don't port-forward 8000 instead; `http.server` is not meant to face the
+public internet.
 
 Analysis on Windows: download the DuckDB CLI (`duckdb.exe`, a single file)
 and run `Get-Content analysis.sql | .\duckdb.exe` from the repo folder.
