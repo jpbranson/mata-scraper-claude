@@ -21,7 +21,7 @@ from pathlib import Path
 import requests
 from google.transit import gtfs_realtime_pb2
 
-from cadavl_to_gtfs_rt import BASE, HEADERS, LINE_TO_ROUTE_ID
+from cadavl_to_gtfs_rt import BASE, HEADERS, route_id_for
 
 REFRESH_SECONDS = 3600
 
@@ -92,7 +92,7 @@ def parse_detours(payload: dict) -> list[dict]:
                        for grp in line.get("tronconsDeviation", [])]
         detours.append({
             "line_internal_id": line_id,
-            "route_id": LINE_TO_ROUTE_ID.get(line_id, f"cadavl:{line_id}"),
+            "route_id": route_id_for(line_id),
             "bypassed_segment_ids": bypassed,
             "affected_stop_ids": stops_by_line.get(line_id, []),
             "detour_paths": [segments_to_linestring(ids, index)

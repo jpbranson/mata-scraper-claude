@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MATA live</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  html, body, #map { height: 100%; margin: 0; }
+  #status { position: absolute; top: 10px; right: 10px; z-index: 1000;
+            background: #fff; padding: 4px 8px; font: 13px sans-serif;
+            border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,.3); }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="status">loading…</div>
+<script>
+// Reads data/latest.json, written by cadavl_to_gtfs_rt.py every poll.
+// Serve the repo root (python -m http.server) — fetch() won't work over file://.
+const POLL_MS = 10000;
+const GHOST_POLLS = 30;   // no GPS movement for 5 min -> drawn hollow
+
+const map = L.map("map").setView([35.15, -90.0], 12);
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+            {attribution: "&copy; OpenStreetMap"}).addTo(map);
+const markers = {};
+
+async function refresh() {
+  const resp = await fetch("data/latest.json", {cache: "no-store"});
+  const {fetched_at, vehicles} = await resp.json();
+  const seen = new Set();
+
+  for (const v of vehicles) {
+    seen.add(v.vehicle_id);
+    const ghost = v.unchanged_polls >= GHOST_POLLS;
+    const style = {radius: 6, weight: 2, color: v.route_color,
+                   fillColor: v.route_color, fillOpacity: ghost ? 0 : 1};
+    const m = markers[v.vehicle_id] ??= L.circleMarker([v.lat, v.lon], style).addTo(map);
+    m.setLatLng([v.lat, v.lon]).setStyle(style);
+    m.bindPopup(
+      `<b>Route ${v.route_id}</b> &middot; bus ${v.equipment_no}<br>` +
+      `${v.destination ?? ""}<br>` +
+      `${v.delay_raw ?? "delay unknown"} &middot; load ${v.occupancy_pct ?? "?"}%<br>` +
+      `${ghost ? "no GPS movement for" : "position unchanged for"} ` +
+      `${v.unchanged_polls * POLL_MS / 1000}s`);
+  }
+  for (const id in markers) {
+    if (!seen.has(id)) { map.removeLayer(markers[id]); delete markers[id]; }
+  }
+  document.getElementById("status").textContent =
+    `${vehicles.length} buses · ${new Date(fetched_at * 1000).toLocaleTimeString()}`;
+}
+
+refresh().catch(console.error);
+setInterval(() => refresh().catch(console.error), POLL_MS);
+</script>
+</body>
+</html>

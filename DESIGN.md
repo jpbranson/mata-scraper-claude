@@ -221,8 +221,12 @@ One always-on machine (Raspberry Pi, small VPS, spare laptop). Two systemd
 units, both `Restart=always`, both with `Environment=TZ=America/Chicago` so
 the service-hours check and log timestamps are local:
 
-- `mata-poller.service` — `python cadavl_to_gtfs_rt.py` in the repo dir.
-- `mata-web.service` — `python -m http.server 8000` in the repo dir.
+- `ops/mata-poller.service` — `python cadavl_to_gtfs_rt.py` in the repo dir.
+- `ops/mata-web.service` — `python -m http.server 8000` in the repo dir;
+  the map is then at `http://<host>:8000/map.html`.
+
+Copy both to `/etc/systemd/system/`, edit the paths, `systemctl enable --now`
+each.
 
 Dependencies (`requirements.txt`): `requests`, `gtfs-realtime-bindings`,
 `duckdb`. Setup is `python -m venv .venv && pip install -r requirements.txt`.
@@ -243,15 +247,14 @@ Failure modes and the response to each:
 
 ## Implementation plan
 
-Each step leaves the project working. Total new code is well under 200 lines
-and the net line count goes down.
+Steps 1–4 are done. Each left the project working; net line count went down.
 
 1. **Poller.** Read `routes.csv` at startup; write all rows every poll; write
    `latest.json`; delete raw archive, dedupe set, and the two hardcoded dicts.
 2. **Map.** Add `map.html`; delete `plot_bus_map.py` and `bus_map.html`.
 3. **Analysis.** Add `analysis.sql` with the three queries above.
-4. **Ops.** Add `requirements.txt`, the two unit files, and `.gitignore`
-   entries for `data/` and `*.html` output. Deploy and let it run.
+4. **Ops.** Add `requirements.txt`, the two unit files under `ops/`, and
+   `.gitignore` entries for generated files. Deploy and let it run.
 5. **After a week of data:** run the queries, sanity-check against personal
    experience of the routes, then decide the open questions below.
 

@@ -1,3 +1,10 @@
 .venv/
 .DS_Store
 __pycache__/
+
+# generated
+data/
+topo.json
+topo_version.txt
+probe_samples.json
+detours.geojson

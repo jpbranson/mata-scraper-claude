@@ -1,0 +1,13 @@
+# Serves map.html and data/latest.json on http://<host>:8000/map.html
+[Unit]
+Description=MATA live map (static file server)
+After=network-online.target
+
+[Service]
+WorkingDirectory=/opt/mata-scraper-claude
+ExecStart=/opt/mata-scraper-claude/.venv/bin/python -m http.server 8000
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

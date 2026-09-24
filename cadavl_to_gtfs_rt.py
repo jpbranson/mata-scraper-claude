@@ -1,9 +1,7 @@
 """
-CADAVL (MATA SWIV) -> GTFS-Realtime adapter.
+CADAVL (MATA SWIV) -> position history, live snapshot, GTFS-Realtime feed.
 
 Mapping verified against a real /topo/vehicules payload (41 buses, 20 lines).
-
-    pip install requests gtfs-realtime-bindings
 
 Test the parser offline against a saved payload:
     python cadavl_to_gtfs_rt.py --sample vehicules.json
@@ -15,7 +13,7 @@ Run the poller:
 from __future__ import annotations
 
 import argparse
-import base64
+import csv
 import gzip
 import json
 import re
@@ -31,14 +29,16 @@ from google.transit import gtfs_realtime_pb2
 # --------------------------------------------------------------------------
 
 BASE = "https://swiv.mata.cadavl.com/SWIV/MATA/proxy/restWS"
-AGENCY = "MATA"
 
 # Measured from the tracker's own traffic: consecutive vehicules requests
 # 10.000 s apart. Server latency was 0.9-3.4 s, so keep timeouts above that.
 POLL_SECONDS = 10
 SERVICE_HOURS = (4, 24)
-OUT_DIR = Path("data")
+HERE = Path(__file__).parent
+OUT_DIR = HERE / "data"
 FEED_PATH = OUT_DIR / "vehicle_positions.pb"
+LATEST_PATH = OUT_DIR / "latest.json"
+ROUTES_CSV = HERE / "routes.csv"
 
 # Taken from a working browser request. Note what is NOT here: no cookie, no
 # token, no API key. The endpoints are stateless, so no session handling is
@@ -52,28 +52,6 @@ HEADERS = {
     "User-Agent": "mata-position-archiver/0.1 (personal research; you@example.com)",
 }
 
-# idLigne -> MATA route number, from /topo. NOT derivable: route 01 is
-# idLigne 109149 while route 34 is 109134. Rebuild with build_crosswalk.py
-# whenever /config/version changes.
-LINE_TO_ROUTE_ID: dict[int, str] = {
-    109149: "01", 109148: "02", 109147: "04", 109146: "07", 109145: "08",
-    109156: "11", 109155: "12", 109158: "13", 109135: "16", 109154: "19",
-    109153: "28", 109152: "30", 109143: "32", 109134: "34", 109142: "36",
-    109141: "37", 109140: "39", 109144: "40", 109139: "42", 109138: "50",
-    109137: "52", 109136: "53", 109151: "57", 109150: "69", 109157: "100",
-}
-
-ROUTE_NAMES: dict[str, str] = {
-    "01": "UNION", "02": "MADISON", "04": "WALKER", "07": "SHELBY & HOLMES",
-    "08": "CHELSEA & HIGHLAND", "11": "FRAYSER", "12": "MALLORY",
-    "13": "LAUDERDALE", "16": "SOUTHEAST CIRCULATOR", "19": "VOLLINTINE",
-    "28": "AIRPORT", "30": "BROOKS", "32": "HOLLYWOOD & HAWKINS MILL",
-    "34": "CENTRAL & WALNUT GROVE", "36": "LAMAR", "37": "PERKINS",
-    "39": "SOUTH THIRD", "40": "STAGE & LAUDERDALE", "42": "CROSSTOWN",
-    "50": "POPLAR", "52": "JACKSON", "53": "SUMMER", "57": "PARK",
-    "69": "WINCHESTER", "100": "TROLLEY MAIN LINE",
-}
-
 # `vitesse` units are unconfirmed (observed range 0-20). GTFS-RT wants metres
 # per second. Set this once you've measured it, and speed will be emitted.
 #   "unknown" -> omit speed from the feed (default, and correct for now)
@@ -83,28 +61,43 @@ _SPEED_TO_MS = {"mph": 0.44704, "kmh": 0.27778, "ms": 1.0}
 
 
 # --------------------------------------------------------------------------
+# Route crosswalk
+# --------------------------------------------------------------------------
+
+def load_routes(path: Path = ROUTES_CSV) -> dict[int, dict]:
+    """idLigne -> {route_id, color}, from routes.csv (build_crosswalk.py).
+
+    NOT derivable: route 01 is idLigne 109149 while route 34 is 109134. It
+    changes whenever MATA restructures service; rebuild when the poller
+    starts printing `cadavl:<id>` route ids."""
+    if not path.exists():
+        return {}
+    with path.open(encoding="utf-8") as fh:
+        return {
+            int(r["line_internal_id"]): {
+                "route_id": r["route_short_name"],
+                "color": f"#{r['route_color']}" if r["route_color"] else "#3388ff",
+            }
+            for r in csv.DictReader(fh)
+        }
+
+
+ROUTES = load_routes()
+
+
+def route_id_for(line_id: int | None) -> str:
+    return ROUTES.get(line_id, {}).get("route_id", f"cadavl:{line_id}")
+
+
+# --------------------------------------------------------------------------
 # Fetching
 # --------------------------------------------------------------------------
 
-def encode_lines(route_codes: list[str]) -> str:
-    """Base64 of 'MATA:01___MATA:02___...'. The separator is three
-    underscores INSIDE the encoded string, not a comma between values —
-    confirmed by decoding the tracker's own request.
-
-    In practice you don't need this: the unfiltered call returned every
-    vehicle anyway (12,606 bytes unfiltered vs 12,633 filtered)."""
-    joined = "___".join(f"{AGENCY}:{c}" for c in route_codes)
-    return base64.b64encode(joined.encode()).decode()
-
-
-def fetch_vehicles(session: requests.Session,
-                   route_codes: list[str] | None = None) -> dict:
-    """The sample payload contained every line at once, so try the unfiltered
-    call first — one request for the whole fleet beats 20 requests."""
-    params: dict[str, object] = {"_tmp": int(time.time() * 1000)}
-    if route_codes:
-        params["lignes"] = encode_lines(route_codes)
-    resp = session.get(f"{BASE}/topo/vehicules", params=params,
+def fetch_vehicles(session: requests.Session) -> dict:
+    """The unfiltered call returns every vehicle at once (the `lignes` filter
+    changes nothing), so one request covers the whole fleet."""
+    resp = session.get(f"{BASE}/topo/vehicules",
+                       params={"_tmp": int(time.time() * 1000)},
                        headers=HEADERS, timeout=10)
     resp.raise_for_status()
     return resp.json()
@@ -176,7 +169,8 @@ def normalize_vehicle(raw: dict, fetched_at: int) -> dict | None:
         "equipment_no": raw.get("numeroEquipement"),   # fleet number on the bus
         "vehicle_type": raw.get("type"),               # "Bus"; trolleys may differ
         "line_internal_id": line_id,
-        "route_id": LINE_TO_ROUTE_ID.get(line_id, f"cadavl:{line_id}"),
+        "route_id": route_id_for(line_id),
+        "route_color": ROUTES.get(line_id, {}).get("color", "#3388ff"),
         "lat": float(loc["lat"]),
         "lon": float(loc["lng"]),
         "bearing": loc.get("cap"),                     # degrees, 0-360
@@ -189,13 +183,6 @@ def normalize_vehicle(raw: dict, fetched_at: int) -> dict | None:
         "delay_raw": drive.get("avanceRetard"),
         "delay_capped": delay_capped,
     }
-
-
-def position_key(v: dict) -> tuple:
-    """No report timestamp means we can't dedupe on one. Dedupe on the fields
-    that change when the bus moves instead."""
-    return (v["vehicle_id"], v["lat"], v["lon"],
-            v["next_stop_name"], v["delay_raw"])
 
 
 class StaleTracker:
@@ -221,7 +208,7 @@ class StaleTracker:
 
 
 # --------------------------------------------------------------------------
-# GTFS-Realtime output
+# Outputs
 # --------------------------------------------------------------------------
 
 def build_feed(vehicles: list[dict], header_time: int):
@@ -261,25 +248,22 @@ def build_feed(vehicles: list[dict], header_time: int):
     return feed
 
 
-def write_feed(feed) -> None:
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    tmp = FEED_PATH.with_suffix(".pb.tmp")
-    tmp.write_bytes(feed.SerializeToString())
-    tmp.replace(FEED_PATH)
-
-
-def archive_raw(payload: dict, fetched_at: int) -> None:
-    """Keep the untouched payload forever — the vendor's fields are
-    undocumented and you will want to re-parse."""
-    day = datetime.fromtimestamp(fetched_at, timezone.utc).strftime("%Y-%m-%d")
-    path = OUT_DIR / f"raw/dt={day}/vehicules.jsonl.gz"
+def write_atomic(path: Path, data: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with gzip.open(path, "at", encoding="utf-8") as fh:
-        fh.write(json.dumps({"fetched_at": fetched_at, "payload": payload}) + "\n")
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_bytes(data)
+    tmp.replace(path)
+
+
+def write_latest(rows: list[dict], fetched_at: int) -> None:
+    """Current snapshot for map.html and the "right now" query."""
+    write_atomic(LATEST_PATH, json.dumps(
+        {"fetched_at": fetched_at, "vehicles": rows}).encode())
 
 
 def archive_positions(rows: list[dict], fetched_at: int) -> None:
-    """Deduped, parsed rows — this is the analysis table."""
+    """One row per vehicle per poll, so every row stands for the same
+    POLL_SECONDS of bus-time and plain averages are time-weighted."""
     day = datetime.fromtimestamp(fetched_at, timezone.utc).strftime("%Y-%m-%d")
     path = OUT_DIR / f"positions/dt={day}/positions.jsonl.gz"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -305,13 +289,12 @@ def run_sample(path: str) -> None:
     unmapped = {r["line_internal_id"] for r in rows
                 if r["route_id"].startswith("cadavl:")}
     if unmapped:
-        print(f"\nWARNING: {len(unmapped)} lines have no GTFS route_id: "
-              f"{sorted(unmapped)}")
+        print(f"\nWARNING: {len(unmapped)} lines have no route_id: "
+              f"{sorted(unmapped)} — rebuild routes.csv")
 
 
 def run_poller() -> None:
     session = requests.Session()
-    seen: set[tuple] = set()
     stale = StaleTracker()
 
     while True:
@@ -322,21 +305,16 @@ def run_poller() -> None:
         fetched_at = int(time.time())
         try:
             payload = fetch_vehicles(session)
-            archive_raw(payload, fetched_at)
-
             rows = [r for r in (normalize_vehicle(v, fetched_at)
                                 for v in iter_raw_vehicles(payload)) if r]
             for r in rows:
                 r["unchanged_polls"] = stale.update(r)
 
-            fresh = [r for r in rows if position_key(r) not in seen]
-            seen.update(position_key(r) for r in fresh)
-            if len(seen) > 20_000:      # keep the dedupe set from growing forever
-                seen = {position_key(r) for r in rows}
-
-            archive_positions(fresh, fetched_at)
-            write_feed(build_feed(rows, fetched_at))
-            print(f"{len(rows)} vehicles, {len(fresh)} moved")
+            archive_positions(rows, fetched_at)
+            write_latest(rows, fetched_at)
+            write_atomic(FEED_PATH, build_feed(rows, fetched_at).SerializeToString())
+            print(f"{len(rows)} vehicles, "
+                  f"{sum(r['unchanged_polls'] == 0 for r in rows)} moved")
 
         except requests.RequestException as exc:
             print(f"fetch failed: {exc}")

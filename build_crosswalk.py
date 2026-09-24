@@ -80,19 +80,6 @@ def write_csv(path: Path, rows: list[dict]) -> None:
     print(f"wrote {path} ({len(rows)} rows)")
 
 
-def load_route_map(path: Path = ROUTES_CSV) -> dict[int, str]:
-    """idLigne -> route short name, for the adapter.
-
-    NOTE the mapping is not derivable — 01 is 109149 while 34 is 109134.
-    It has to be looked up, and it will change whenever MATA restructures
-    service, so rebuild after any /config/version bump."""
-    if not path.exists():
-        return {}
-    with path.open(encoding="utf-8") as fh:
-        return {int(r["line_internal_id"]): r["route_short_name"]
-                for r in csv.DictReader(fh)}
-
-
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--topo", help="path to a saved /topo payload")

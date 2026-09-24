@@ -1,0 +1,16 @@
+# Copy to /etc/systemd/system/, edit the two paths, then:
+#   systemctl enable --now mata-poller
+[Unit]
+Description=MATA bus position poller
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/opt/mata-scraper-claude
+ExecStart=/opt/mata-scraper-claude/.venv/bin/python cadavl_to_gtfs_rt.py
+Restart=always
+RestartSec=10
+Environment=TZ=America/Chicago
+
+[Install]
+WantedBy=multi-user.target
