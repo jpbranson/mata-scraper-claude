@@ -264,6 +264,9 @@ and opens port 8000 to the home LAN and Tailscale only:
 - `mata-web` — `python -m http.server 8000`; the map is at
   `http://localhost:8000/map.html`.
 
+After pulling new code, `.\ops\update.ps1` (same admin PowerShell) pulls,
+reinstalls requirements if they changed, and restarts both tasks.
+
 The machine's clock is already Central time, so the service-hours check
 needs no time-zone setting. Do set Power settings to never sleep (and, on
 a laptop, "do nothing" on lid close, plugged in).
