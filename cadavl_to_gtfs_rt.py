@@ -18,7 +18,6 @@ import gzip
 import json
 import re
 import time
-from collections import defaultdict, deque
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -34,7 +33,7 @@ BASE = "https://swiv.mata.cadavl.com/SWIV/MATA/proxy/restWS"
 # Measured from the tracker's own traffic: consecutive vehicules requests
 # 10.000 s apart. Server latency was 0.9-3.4 s, so keep timeouts above that.
 POLL_SECONDS = 10
-TRAIL_POLLS = 30            # 5 minutes of positions per bus in latest.json
+REPLAY_EVERY = 3            # one replay frame per 30 s
 SERVICE_HOURS = (4, 24)
 HERE = Path(__file__).parent
 OUT_DIR = HERE / "data"
@@ -258,9 +257,26 @@ def write_atomic(path: Path, data: bytes) -> None:
 
 
 def write_latest(rows: list[dict], fetched_at: int) -> None:
-    """Current snapshot for map.html and the "right now" query."""
+    """Current snapshot for map.html and the "right now" query. `day` is the
+    poller's local service day, which names the replay file."""
     write_atomic(LATEST_PATH, json.dumps(
-        {"fetched_at": fetched_at, "vehicles": rows}).encode())
+        {"fetched_at": fetched_at, "day": datetime.fromtimestamp(fetched_at).strftime("%Y-%m-%d"),
+         "vehicles": rows}).encode())
+
+
+def write_replay_frame(rows: list[dict], fetched_at: int) -> None:
+    """Compact frame for map.html's replay: one line per REPLAY_EVERY polls,
+    one file per local service day, ~8 MB/day. The page builds trails from
+    these too, so they show the moment it opens."""
+    day = datetime.fromtimestamp(fetched_at).strftime("%Y-%m-%d")  # local date
+    path = OUT_DIR / f"replay/{day}.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    frame = {"t": fetched_at, "v": [
+        [r["vehicle_id"], r["route_id"], round(r["lat"], 5), round(r["lon"], 5),
+         r["bearing"], r["delay_seconds"], r["delay_capped"], r["occupancy_pct"],
+         r["unchanged_polls"]] for r in rows]}
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(frame, separators=(",", ":")) + "\n")
 
 
 def archive_positions(rows: list[dict], fetched_at: int) -> None:
@@ -298,8 +314,7 @@ def run_sample(path: str) -> None:
 def run_poller() -> None:
     session = requests.Session()
     stale = StaleTracker()
-    # Last TRAIL_POLLS positions per vehicle, for the map only (not history).
-    trails: dict[str, deque] = defaultdict(lambda: deque(maxlen=TRAIL_POLLS))
+    polls = 0
 
     while True:
         if not SERVICE_HOURS[0] <= datetime.now().hour < SERVICE_HOURS[1]:
@@ -315,10 +330,10 @@ def run_poller() -> None:
                 r["unchanged_polls"] = stale.update(r)
 
             archive_positions(rows, fetched_at)
-            for r in rows:
-                trails[r["vehicle_id"]].append([r["lat"], r["lon"]])
-                r["trail"] = list(trails[r["vehicle_id"]])
             write_latest(rows, fetched_at)
+            polls += 1
+            if polls % REPLAY_EVERY == 1:
+                write_replay_frame(rows, fetched_at)
             write_atomic(FEED_PATH, build_feed(rows, fetched_at).SerializeToString())
             print(f"{len(rows)} vehicles, "
                   f"{sum(r['unchanged_polls'] == 0 for r in rows)} moved")

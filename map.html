@@ -30,16 +30,28 @@
   #stats { top: 14px; right: 14px; display: flex; gap: 24px; padding: 12px 18px; }
   #stats b { display: block; font-size: 34px; font-weight: 600; line-height: 1.1; }
   #stats span { color: var(--muted); }
-  #clock { position: absolute; top: 92px; right: 14px; z-index: 1000; color: var(--muted);
-    display: flex; align-items: center; gap: 6px; }
-  #clock i { width: 9px; height: 9px; border-radius: 50%; background: #0ca30c; }
-  #clock.stale i { background: var(--late20); }
-  #legend { bottom: 28px; left: 14px; padding: 12px 16px; color: var(--ink-2); }
+  #legend { bottom: 92px; left: 14px; padding: 12px 16px; color: var(--ink-2); }
   #legend div { display: flex; align-items: center; gap: 9px; margin: 4px 0; }
   #legend i { width: 14px; height: 14px; border-radius: 50%; flex: none; }
   #legend .sz i { background: var(--muted); }
   #legend .ghost i { background: none; border: 2px dashed var(--muted); }
   #legend .stop i { width: 8px; height: 8px; background: var(--surface); border: 2px solid var(--hairline); }
+
+  /* Timeline: play/pause, scrubber, clock, speed, LIVE, day. */
+  #bar { bottom: 14px; left: 14px; right: 14px; display: flex; align-items: center; gap: 14px; padding: 10px 16px; }
+  #bar button { font: 600 16px Inter, system-ui, sans-serif; color: var(--ink); background: none;
+    border: 1.5px solid var(--hairline); border-radius: 8px; padding: 6px 12px; cursor: pointer; min-width: 44px; }
+  #bar button.on { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+  #live.on { background: var(--late20); border-color: var(--late20); color: #fff; }
+  #bar input[type=range] { flex: 1; accent-color: var(--focus); min-width: 80px; }
+  #bar input[type=date] { font: 16px Inter, system-ui, sans-serif; color: var(--ink); background: none;
+    border: 1.5px solid var(--hairline); border-radius: 8px; padding: 5px 8px; }
+  #clock { min-width: 5.5em; text-align: center; font-variant-numeric: tabular-nums; display: flex;
+    align-items: center; justify-content: center; gap: 6px; }
+  #clock i { width: 9px; height: 9px; border-radius: 50%; background: #0ca30c; display: none; }
+  #clock.live i { display: block; }
+  #clock.stale i { background: var(--late20); }
+
   .bus { background: none; border: none; }
   .bus svg { overflow: visible; }
   .bus text { font: 600 16px Inter, system-ui, sans-serif; text-anchor: middle; }
@@ -51,6 +63,7 @@
   .leaflet-tooltip small { font-size: 16px; color: var(--muted); }
   .leaflet-container { background: var(--surface); font: 16px Inter, system-ui, sans-serif; }
   .leaflet-control-attribution { font-size: 16px; }
+  .leaflet-bottom.leaflet-right { bottom: 78px; }
   .leaflet-tile-pane { filter: grayscale(1) contrast(.85) opacity(.7); }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .leaflet-tile-pane {
     filter: invert(1) grayscale(1) brightness(.75) contrast(1.1); } }
@@ -63,7 +76,6 @@
   <div><b id="n-late">–</b><span>late 5+ min</span></div>
   <div><b id="n-ride">–</b><span>riders (est.)</span></div>
 </div>
-<div id="clock"><i></i><span id="clock-t"></span></div>
 <div id="legend" class="panel">
   <div><i style="background:var(--early)"></i>early</div>
   <div><i style="background:var(--ontime)"></i>on time</div>
@@ -74,13 +86,23 @@
   <div class="ghost"><i></i>no GPS movement</div>
   <div class="stop"><i></i>stop</div>
 </div>
+<div id="bar" class="panel">
+  <button id="play" title="play / pause">&#9654;</button>
+  <input id="scrub" type="range" min="0" max="0" value="0">
+  <div id="clock"><i></i><span id="clock-t">–</span></div>
+  <button id="speed" title="replay speed">60&times;</button>
+  <button id="live" title="back to live">LIVE</button>
+  <input id="day" type="date">
+</div>
 <script>
-// Reads data/latest.json (written by cadavl_to_gtfs_rt.py every poll) and
-// network.geojson (routes + stops, built by build_crosswalk.py). Serve the
+// Data: data/latest.json every 10 s (live), data/replay/<day>.jsonl once per
+// day viewed (one frame per 30 s, written by cadavl_to_gtfs_rt.py), and
+// network.geojson once (routes + stops, from build_crosswalk.py). Serve the
 // repo root over HTTP — fetch() won't work over file://.
-const POLL_MS = 10000, GHOST_POLLS = 30, CAPACITY = 40;
+const POLL_MS = 10000, FRAME_S = 30, TRAIL_S = 300, GHOST_POLLS = 30, CAPACITY = 40;
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const dark = matchMedia("(prefers-color-scheme: dark)");
+const $ = (id) => document.getElementById(id);
 
 const map = L.map("map", { preferCanvas: true, zoomControl: false }).setView([35.12, -89.97], 12);
 L.control.zoom({ position: "bottomright" }).addTo(map);
@@ -102,6 +124,14 @@ function tier(v) {
   return "ontime";
 }
 const RANK = { ontime: 0, early: 1, late5: 2, late10: 3, late20: 4 };
+function delayText(v) {
+  const d = v.delay_seconds;
+  if (v.delay_raw) return v.delay_raw;
+  if (d == null) return "no delay data";
+  if (v.delay_capped) return d < 0 ? "1h+ early" : "1h+ late";
+  const m = Math.round(Math.abs(d) / 60);
+  return m === 0 ? "on time" : `${m} min ${d < 0 ? "early" : "late"}`;
+}
 
 // --- Network: route lines + stops ------------------------------------------
 let routes = null, stops = null, focusRoute = null;
@@ -130,13 +160,73 @@ function restyle() {
 }
 map.on("zoomend", restyle);
 map.on("click", () => setFocus(null));
-dark.addEventListener("change", restyle);
+dark.addEventListener("change", () => { restyle(); draw(); });
 function setFocus(routeId) {
   focusRoute = routeId === focusRoute ? null : routeId;
   if (routes) routes.setStyle(routeStyle);
 }
 
-// --- Buses -----------------------------------------------------------------
+// --- Timeline --------------------------------------------------------------
+// frames: the viewed day's snapshots, oldest first, one per FRAME_S.
+// cursor: index into frames while replaying, or null when live.
+let frames = [], cursor = null, live = null, playing = false, speed = 60, ticker = null;
+const SPEEDS = [10, 60, 300];
+// The poller's local service day (from latest.json), which names today's
+// replay file — not the viewer's clock, which may be in another time zone.
+let serverDay = null;
+const today = () => serverDay;
+
+const fromLine = (line) => { const f = JSON.parse(line); return { t: f.t, v: f.v.map(a => ({
+  vehicle_id: a[0], route_id: a[1], lat: a[2], lon: a[3], bearing: a[4], delay_seconds: a[5],
+  delay_capped: a[6], occupancy_pct: a[7], unchanged_polls: a[8] })) }; };
+
+async function loadDay(day) {
+  const r = await fetch(`data/replay/${day}.jsonl`, { cache: "no-store" });
+  frames = r.ok ? (await r.text()).split("\n").filter(Boolean).map(fromLine) : [];
+  $("scrub").max = Math.max(frames.length - 1, 0);
+}
+function current() { return cursor == null ? live : frames[cursor]; }
+// Positions per bus over the TRAIL_S before frame `f` (plus f itself).
+function trailsAt(f) {
+  const out = {}, end = cursor == null ? frames.length : cursor;
+  for (let i = end - 1; i >= 0 && f.t - frames[i].t <= TRAIL_S; i--)
+    for (const v of frames[i].v) (out[v.vehicle_id] ??= []).unshift([v.lat, v.lon]);
+  for (const v of f.v) (out[v.vehicle_id] ??= []).push([v.lat, v.lon]);
+  return out;
+}
+
+function setCursor(i) {
+  cursor = Math.max(0, Math.min(i, frames.length - 1));
+  if (!frames.length) cursor = null;
+  draw();
+}
+function goLive() {
+  playing = false; clearInterval(ticker); cursor = null;
+  if ($("day").value !== today()) { $("day").value = today(); loadDay(today()).then(draw); }
+  draw();
+}
+function play(on) {
+  playing = on; clearInterval(ticker);
+  if (!on) return draw();
+  if (cursor == null) cursor = Math.max(frames.length - 1, 0);
+  ticker = setInterval(() => {
+    if (cursor >= frames.length - 1) {
+      if ($("day").value === today()) return goLive();
+      return play(false);
+    }
+    setCursor(cursor + 1);
+  }, FRAME_S * 1000 / speed);
+  draw();
+}
+$("play").onclick = () => play(!playing);
+$("scrub").oninput = (e) => setCursor(+e.target.value);
+$("speed").onclick = () => { speed = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length];
+  $("speed").innerHTML = speed + "&times;"; if (playing) play(true); };
+$("live").onclick = goLive;
+$("day").onchange = async (e) => { playing = false; clearInterval(ticker);
+  await loadDay(e.target.value); cursor = frames.length ? 0 : null; draw(); };
+
+// --- Drawing ---------------------------------------------------------------
 const markers = {}, trails = {};
 function icon(v) {
   const ghost = v.unchanged_polls >= GHOST_POLLS;
@@ -157,9 +247,9 @@ function icon(v) {
 function tip(v) {
   const load = v.occupancy_pct == null ? "" : ` &middot; ${v.occupancy_pct}% full`;
   const ghost = v.unchanged_polls >= GHOST_POLLS ? `<br><small>no GPS movement for ${Math.round(v.unchanged_polls * POLL_MS / 60000)} min</small>` : "";
-  return `<b>${v.route_id}</b> ${v.destination ?? ""}<br>${v.delay_raw ?? "no delay data"}${load}<br><small>bus ${v.equipment_no}</small>${ghost}`;
+  const bus = v.equipment_no ? `<br><small>bus ${v.equipment_no}</small>` : "";
+  return `<b>${v.route_id}</b> ${v.destination ?? ""}<br>${delayText(v)}${load}${bus}${ghost}`;
 }
-
 // Trail: one segment per pair of positions. Newest is bright and solid,
 // oldest is darkened and faint.
 const shade = (hex, k) => "#" + [1, 3, 5].map(i =>
@@ -175,38 +265,65 @@ function drawTrail(group, pts, hex) {
   }
 }
 
-async function refresh() {
-  const resp = await fetch("data/latest.json", { cache: "no-store" });
-  const { fetched_at, vehicles } = await resp.json();
+function draw() {
+  const f = current();
   const seen = new Set();
   let late = 0, riders = 0;
+  if (f) {
+    const tr = trailsAt(f);
+    for (const v of f.v) {
+      seen.add(v.vehicle_id);
+      const t = tier(v), pos = [v.lat, v.lon];
+      if (RANK[t] >= 2) late++;
+      if (v.occupancy_pct != null) riders += v.occupancy_pct / 100 * CAPACITY;
 
-  for (const v of vehicles) {
-    seen.add(v.vehicle_id);
-    const t = tier(v), pos = [v.lat, v.lon];
-    if (RANK[t] >= 2) late++;
-    if (v.occupancy_pct != null) riders += v.occupancy_pct / 100 * CAPACITY;
+      const m = markers[v.vehicle_id] ??= L.marker(pos, { icon: icon(v) })
+        .bindTooltip("", { direction: "top", offset: [0, -20], opacity: 1 })
+        .on("click", (e) => { L.DomEvent.stop(e); setFocus(m.routeId); })
+        .addTo(map);
+      m.routeId = v.route_id;
+      m.setLatLng(pos).setIcon(icon(v)).setZIndexOffset(RANK[t] * 1000).setTooltipContent(tip(v));
 
-    const m = markers[v.vehicle_id] ??= L.marker(pos, { icon: icon(v) })
-      .bindTooltip("", { direction: "top", offset: [0, -20], opacity: 1 })
-      .on("click", (e) => { L.DomEvent.stop(e); setFocus(m.routeId); })
-      .addTo(map);
-    m.routeId = v.route_id;
-    m.setLatLng(pos).setIcon(icon(v)).setZIndexOffset(RANK[t] * 1000).setTooltipContent(tip(v));
-
-    const pts = v.trail ?? [];
-    if (pts.length > 1) drawTrail(trails[v.vehicle_id] ??= L.layerGroup().addTo(map), pts, css("--" + t));
+      const pts = tr[v.vehicle_id] ?? [];
+      if (pts.length > 1) drawTrail(trails[v.vehicle_id] ??= L.layerGroup().addTo(map), pts, css("--" + t));
+      else if (trails[v.vehicle_id]) trails[v.vehicle_id].clearLayers();
+    }
   }
   for (const id in markers) if (!seen.has(id)) {
     map.removeLayer(markers[id]); delete markers[id];
     if (trails[id]) { map.removeLayer(trails[id]); delete trails[id]; }
   }
 
-  document.getElementById("n-bus").textContent = vehicles.length;
-  document.getElementById("n-late").textContent = late;
-  document.getElementById("n-ride").textContent = "~" + Math.round(riders);
-  document.getElementById("clock-t").textContent = new Date(fetched_at * 1000).toLocaleTimeString([], { timeStyle: "short" });
-  document.getElementById("clock").classList.toggle("stale", Date.now() / 1000 - fetched_at > 90);
+  $("n-bus").textContent = f ? f.v.length : "–";
+  $("n-late").textContent = f ? late : "–";
+  $("n-ride").textContent = f ? "~" + Math.round(riders) : "–";
+  $("clock-t").textContent = f ? new Date(f.t * 1000).toLocaleTimeString([], { timeStyle: "short" }) : "–";
+  $("clock").classList.toggle("live", cursor == null);
+  $("clock").classList.toggle("stale", cursor == null && !!f && Date.now() / 1000 - f.t > 90);
+  $("play").innerHTML = playing ? "&#10074;&#10074;" : "&#9654;";
+  $("play").classList.toggle("on", playing);
+  $("live").classList.toggle("on", cursor == null);
+  $("scrub").value = cursor == null ? frames.length - 1 : cursor;
+  $("scrub").max = Math.max(frames.length - 1, 0);
+}
+
+// --- Live ------------------------------------------------------------------
+async function refresh() {
+  const resp = await fetch("data/latest.json", { cache: "no-store" });
+  const { fetched_at, day, vehicles } = await resp.json();
+  live = { t: fetched_at, v: vehicles };
+  // First load, or the service day rolled over while watching live: load
+  // that day's frames.
+  if (day !== serverDay && (serverDay == null || cursor == null)) {
+    serverDay = day; $("day").value = day;
+    await loadDay(day);
+  }
+  // Extend today's timeline at the file's cadence so trails keep growing
+  // between page loads and the scrubber reaches "now".
+  if ($("day").value === today() && (!frames.length || fetched_at - frames.at(-1).t >= FRAME_S - 5)
+      && (!frames.length || fetched_at > frames.at(-1).t))
+    frames.push(live);
+  if (cursor == null) draw();
 }
 
 refresh().catch(console.error);

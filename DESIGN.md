@@ -54,6 +54,7 @@ Known limits of the vehicle payload, which shape the design:
                                       │
                                       ├─▶ data/positions/dt=YYYY-MM-DD/positions.jsonl.gz   history (append)
                                       ├─▶ data/latest.json                                  current snapshot
+                                      ├─▶ data/replay/YYYY-MM-DD.jsonl                       one frame per 30 s, for replay
                                       └─▶ data/vehicle_positions.pb                         GTFS-RT feed
 
  map.html  ── fetches data/latest.json every 10 s ──▶  live map      (served by python -m http.server)
@@ -89,9 +90,14 @@ days to Parquet with one DuckDB `COPY` — not now.
 
 **Snapshot — `data/latest.json`.** The same rows for the current poll plus
 `fetched_at`, written atomically (tmp file + rename). The map reads this; so
-does the "right now" query. Each row also carries `trail`, the bus's last 30
-positions (five minutes), kept in memory by the poller for the map only —
-history rows don't have it.
+does the "right now" query.
+
+**Replay — `data/replay/<local day>.jsonl`.** Every third poll (30 s) one
+compact line: the poll time and, per bus, `[id, route, lat, lon, bearing,
+delay_seconds, delay_capped, occupancy_pct, unchanged_polls]`. About 8 MB
+for a full day. The map loads the viewed day's file once; it drives both the
+replay scrubber and the trails (so trails are there the moment the page
+opens, not five minutes after the poller starts).
 
 **GTFS-RT — `data/vehicle_positions.pb`.** Already implemented; ~30 lines and
 one dependency. Kept because it is the standard interchange format, but
@@ -122,7 +128,8 @@ draws it as the background.
 ### 3. Live map — `map.html`
 
 One static page, Leaflet from a CDN, no build step. It fetches
-`data/latest.json` every 10 s and `network.geojson` once. Visual-first: the
+`data/latest.json` every 10 s, the day's `data/replay/` file once, and
+`network.geojson` once. Visual-first: the
 picture carries the information and text is confined to a tooltip and a
 three-number strip. All text is Inter (Google Fonts) at 16 px (12 pt) or
 larger, including the route numbers inside the markers.
@@ -134,9 +141,10 @@ Encodings, per bus:
   status palette). `"1h+"` capped values count as 20+.
 - **Size = passenger load** (`occupancy_pct`), radius 9–16 px.
 - **Number = route**, a wedge on the rim = heading.
-- **Trail** = last five minutes of positions, in the tier color, drawn as
-  one segment per pair: bright, thick and solid where the bus just was,
-  darker, thinner and fainter as it ages.
+- **Trail** = the five minutes of positions before the viewed moment (from
+  the replay frames), in the tier color, one segment per pair: bright,
+  thick and solid where the bus just was, darker, thinner and fainter as it
+  ages.
 - **Ghost** (`unchanged_polls` ≥ 30) = dashed hollow circle, no wedge.
 - Late buses are stacked on top of on-time ones.
 
@@ -146,7 +154,11 @@ subordinate to the buses; click a bus and its route highlights while the
 rest dims (click the map to clear). Hover for route,
 headsign, delay text, load, fleet number. Top-right: buses in service, buses
 5+ min late, estimated riders (`CAPACITY = 40`). A dot goes red when the
-snapshot is older than 90 s. Bottom-left legend. The OSM basemap is muted
+snapshot is older than 90 s. Bottom-left legend. Bottom bar: play/pause,
+a scrubber across the day's frames, the clock, replay speed (10× / 60× /
+300× real time), LIVE, and a date picker for earlier days — so any moment
+of any recorded day can be revisited and played forward, with the same
+encodings and trails. The OSM basemap is muted
 with a CSS filter so the data reads on top; dark mode inverts it and follows
 the OS setting.
 
