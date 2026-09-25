@@ -38,10 +38,12 @@
   #legend .stop i { width: 8px; height: 8px; background: var(--surface); border: 2px solid var(--stop); }
   #legend .hub i { border-radius: 3px; background: var(--surface); border: 3px solid var(--ink); width: 10px; height: 10px; }
   #legend .garage i { border-radius: 3px; background: var(--ink); }
+  #legend .trolley i { border-radius: 2px; background: var(--muted); width: 11px; height: 11px;
+    transform: rotate(45deg); margin: 0 1.5px; }
   .place { background: none; border: none; }
 
   /* Stop panel: per route, the last and next scheduled trips at the stop. */
-  #stop { top: 124px; right: 14px; width: 380px; max-height: calc(100% - 300px); overflow: auto;
+  #stop { top: 124px; right: 14px; width: 380px; max-height: calc(100% - 214px); overflow: auto;
     padding: 12px 16px 14px; }
   #stop[hidden] { display: none; }
   #stop h2 { font-size: 18px; font-weight: 600; margin: 0 36px 2px 0; }
@@ -58,6 +60,17 @@
   #stop tr.now td { border-top: 1.5px solid var(--focus); padding: 0; height: 0; }
   #stop .past { color: var(--ink-2); }
   #stop .muted, #stop small { color: var(--muted); font-size: 16px; }
+  #stop h2 .chip { margin-right: 6px; }
+  #stop .sub { color: var(--ink-2); margin-bottom: 4px; }
+  #stop h3 { font-size: 16px; font-weight: 600; margin: 14px 0 0; }
+  #stop td small { display: block; }
+  #stop .chart { position: relative; margin-top: 6px; }
+  #stop .chart svg { display: block; overflow: visible; touch-action: none; }
+  #stop .chart text { font: 16px Inter, system-ui, sans-serif; fill: var(--muted); }
+  #stop .chart .tip { position: absolute; top: 0; pointer-events: none; background: var(--surface);
+    border-radius: 6px; box-shadow: 0 0 0 1px var(--ring), 0 2px 8px rgba(0,0,0,.15);
+    padding: 2px 8px; white-space: nowrap; }
+  #stop .chart .tip b { font-weight: 600; }
   #stop .badge { display: inline-block; min-width: 3.2em; text-align: center; border-radius: 6px;
     padding: 0 6px; font-weight: 600; color: #fff; }
 
@@ -94,7 +107,7 @@
     #bar { flex-wrap: wrap; gap: 10px; }
     #bar input[type=range] { flex: 1 1 100%; order: -1; }
     #legend { bottom: 172px; }
-    #stop { top: 14px; left: 14px; right: 14px; width: auto; max-height: 45vh; }
+    #stop { top: 14px; left: 14px; right: 14px; width: auto; max-height: 55vh; }
     body.stop-open #legend { display: none; }
     .leaflet-bottom.leaflet-right { bottom: 158px; }
   }
@@ -117,6 +130,7 @@
   <div><i style="background:var(--late10)"></i>10+ min late</div>
   <div><i style="background:var(--late20)"></i>20+ min late</div>
   <div class="sz"><i style="width:10px;height:10px"></i><i style="width:18px;height:18px"></i>&nbsp;size = load</div>
+  <div class="trolley"><i></i>trolley (route 100)</div>
   <div class="ghost"><i></i>no GPS movement</div>
   <div class="stop"><i></i>stop (click for times)</div>
   <div class="hub"><i></i>transit center</div>
@@ -216,6 +230,7 @@ function delayText(v) {
 // focus: route numbers highlighted (a clicked bus's route, or every route
 // at a clicked stop); everything else dims.
 let routes = null, stops = null, focus = new Set(), stopMark = null;
+const stopName = {};           // stop code -> name as the tracker spells it
 const routeStyle = (f) => focus.has(f.properties.route_id)
   ? { color: css("--focus"), weight: 6, opacity: .9 }
   : { color: css("--hairline"), weight: 2, opacity: focus.size ? .3 : .8 };
@@ -228,6 +243,7 @@ const stopStyle = () => ({ radius: map.getZoom() >= 15 ? 5.5 : 4, color: css("--
 fetch("network.geojson", { cache: "no-cache" }).then(r => r.json()).then(gj => {
   routes = L.geoJSON(gj, { filter: f => f.geometry.type !== "Point", style: routeStyle,
     interactive: false }).addTo(map);
+  for (const f of gj.features) if (f.geometry.type === "Point") stopName[f.properties.code] = f.properties.stop;
   stops = L.geoJSON(gj, { filter: f => f.geometry.type === "Point",
     pointToLayer: (f, ll) => L.circleMarker(ll, stopStyle())
       .bindTooltip(f.properties.stop, { direction: "top", offset: [0, -6], opacity: 1 })
@@ -248,16 +264,22 @@ function restyle() {
   else if (map.hasLayer(stops)) map.removeLayer(stops);
 }
 map.on("zoomend", restyle);
-map.on("click", () => { closeStop(); setFocus([]); });
+map.on("click", () => { closePanel(); setFocus([]); });
 dark.addEventListener("change", () => { restyle(); draw(); });
 function setFocus(ids) {
   focus = new Set(ids);
   restyle(); draw();
 }
-// Clicking a bus highlights its route; clicking it again (or the map) clears.
-function focusBus(routeId) {
-  closeStop();
-  setFocus(focus.size === 1 && focus.has(routeId) ? [] : [routeId]);
+// Clicking a bus opens its panel and highlights its route; clicking it
+// again (or the map) clears both.
+function clickBus(id) {
+  if (busOpen === id) { closePanel(); setFocus([]); return; }
+  const v = current()?.v.find(x => x.vehicle_id === id);
+  closePanel();
+  busOpen = id;
+  openPanel();
+  setFocus(v ? [v.route_id] : []);
+  if (v) reveal([v.lat, v.lon]);
 }
 
 // --- Timeline --------------------------------------------------------------
@@ -331,18 +353,24 @@ $("day").onchange = async (e) => { playing = false; clearInterval(ticker);
 
 // --- Drawing ---------------------------------------------------------------
 const markers = {}, trails = {};
+// The trolley line is drawn as a diamond so it doesn't pass for a bus (the
+// vendor calls every vehicle "Bus"; only the route tells them apart).
+const TROLLEY = new Set(["100"]);
 function icon(v) {
   const ghost = v.unchanged_polls >= GHOST_POLLS;
   const t = tier(v), fill = css("--" + t);
   // Big enough for 16 px digits; grows with passenger load.
   const r = (v.route_id.length > 2 ? 16 : 13) + 6 * Math.min(v.occupancy_pct ?? 0, 100) / 100;
-  const box = r + 10;
+  const trolley = TROLLEY.has(v.route_id), edge = trolley ? r + 6 : r;
+  const box = edge + 10;
   const textColor = t === "late5" ? "#0b0b0b" : "#fff";
   const wedge = (!ghost && v.bearing != null)
-    ? `<path d="M0,${-r - 9} L6,${-r - 1} L-6,${-r - 1} Z" fill="${fill}" transform="rotate(${v.bearing})"/>` : "";
-  const circle = ghost
-    ? `<circle r="${r}" fill="${css("--surface")}" stroke="${css("--muted")}" stroke-width="2" stroke-dasharray="4 3"/>`
-    : `<circle r="${r}" fill="${fill}" stroke="${css("--surface")}" stroke-width="2.5"/>`;
+    ? `<path d="M0,${-edge - 9} L6,${-edge - 1} L-6,${-edge - 1} Z" fill="${fill}" transform="rotate(${v.bearing})"/>` : "";
+  const outline = ghost ? `fill="${css("--surface")}" stroke="${css("--muted")}" stroke-width="2" stroke-dasharray="4 3"`
+    : `fill="${fill}" stroke="${css("--surface")}" stroke-width="2.5"`;
+  const circle = trolley
+    ? `<path d="M0,${-edge} L${edge},0 L0,${edge} L${-edge},0 Z" stroke-linejoin="round" ${outline}/>`
+    : `<circle r="${r}" ${outline}/>`;
   return L.divIcon({ className: "bus", iconSize: [box * 2, box * 2], iconAnchor: [box, box],
     html: `<svg width="${box * 2}" height="${box * 2}" viewBox="${-box} ${-box} ${box * 2} ${box * 2}">
       ${wedge}${circle}<text y="5.5" fill="${ghost ? css("--muted") : textColor}">${v.route_id}</text></svg>` });
@@ -350,7 +378,7 @@ function icon(v) {
 function tip(v) {
   const load = v.occupancy_pct == null ? "" : ` &middot; ${v.occupancy_pct}% full`;
   const ghost = v.unchanged_polls >= GHOST_POLLS ? `<br><small>no GPS movement for ${Math.round(v.unchanged_polls * POLL_MS / 60000)} min</small>` : "";
-  const bus = v.equipment_no ? `<br><small>bus ${v.equipment_no}</small>` : "";
+  const bus = v.equipment_no ? `<br><small>${TROLLEY.has(v.route_id) ? "trolley" : "bus"} ${v.equipment_no}</small>` : "";
   return `<b>${v.route_id}</b> ${v.destination ?? ""}<br>${delayText(v)}${load}${bus}${ghost}`;
 }
 // Trail: one segment per pair of positions. Newest is bright and solid,
@@ -382,9 +410,9 @@ function draw() {
 
       const m = markers[v.vehicle_id] ??= L.marker(pos, { icon: icon(v) })
         .bindTooltip("", { direction: "top", offset: [0, -20], opacity: 1 })
-        .on("click", (e) => { L.DomEvent.stop(e); focusBus(m.routeId); })
+        .on("click", (e) => { L.DomEvent.stop(e); clickBus(m.vehicleId); })
         .addTo(map);
-      m.routeId = v.route_id;
+      m.vehicleId = v.vehicle_id;
       const dim = !focus.size || focus.has(v.route_id) ? 1 : .3;
       m.setLatLng(pos).setIcon(icon(v)).setZIndexOffset(RANK[t] * 1000 + (dim < 1 ? -5000 : 0))
         .setOpacity(dim).setTooltipContent(tip(v));
@@ -392,8 +420,10 @@ function draw() {
       const pts = tr[v.vehicle_id] ?? [];
       if (pts.length > 1) drawTrail(trails[v.vehicle_id] ??= L.layerGroup().addTo(map), pts, css("--" + t), dim);
       else if (trails[v.vehicle_id]) trails[v.vehicle_id].clearLayers();
+      if (v.vehicle_id === busOpen) busRing.setLatLng(pos).addTo(map);
     }
   }
+  if (busOpen && !seen.has(busOpen)) map.removeLayer(busRing);
   for (const id in markers) if (!seen.has(id)) {
     map.removeLayer(markers[id]); delete markers[id];
     if (trails[id]) { map.removeLayer(trails[id]); delete trails[id]; }
@@ -410,17 +440,19 @@ function draw() {
   $("live").classList.toggle("on", cursor == null);
   $("scrub").value = cursor == null ? frames.length - 1 : cursor;
   $("scrub").max = Math.max(frames.length - 1, 0);
-  renderStop();
+  renderPanel();
 }
 
-// --- Stop panel ------------------------------------------------------------
-// Per route serving the stop: the last SHOW and next SHOW scheduled trips,
+// --- Info panel: a stop or a bus -------------------------------------------
+// Stop: per route serving it, the last SHOW and next SHOW scheduled trips,
 // each with when its bus actually came or, live, when it's expected
-// (scheduled + the bus's current delay). The timetable is
-// data/schedule/<day>/ and the arrivals data/arrivals/<day>/, both written
-// by the poller (schedule.py); trips tie them together, and to live buses.
-const SHOW = 3, ARRIVALS_TTL = 30000;
-let stopOpen = null, stopRender = 0;
+// (scheduled + the bus's current delay). Bus: its last SHOW stops (scheduled
+// vs actual) and next SHOW (scheduled vs expected), and its delay over the
+// last CHART_H hours. The timetable is data/schedule/<day>/ and the arrivals
+// data/arrivals/<day>/, both written by the poller (schedule.py); trips tie
+// them together, and to live buses. The delay history is the replay frames.
+const SHOW = 3, ARRIVALS_TTL = 30000, CHART_H = 4, RECENT_S = 5400;
+let stopOpen = null, busOpen = null, panelRender = 0, busRing = null;
 const got = {};                // url -> { until, data } or { pending }
 // Fetch and parse, reusing the result for `ttl` ms (schedules are fixed for
 // the day). A missing file is retried after ARRIVALS_TTL: the poller may
@@ -439,35 +471,58 @@ async function cached(url, ttl, lines) {
   return data;
 }
 const hm = (t) => new Date(t * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: TZ });
+const esc = (x) => String(x ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 function badge(sec) {
   const m = Math.round(sec / 60), t = tier({ delay_seconds: sec });
   return `<span class="badge" style="background:var(--${t});${t === "late5" ? "color:#0b0b0b" : ""}">${m > 0 ? "+" : ""}${m === 0 ? "0" : m}</span>`;
 }
 
-// p: a stop feature's properties ({stop, code}) or a transit center's
-// {stop, codes}.
-async function showStop(props, ll) {
-  const p = stopOpen = { name: props.stop, codes: props.codes ?? (props.code ? [props.code] : []) };
-  (stopMark ??= L.circleMarker(ll, { radius: 11, weight: 3, fill: false, interactive: false }))
-    .setLatLng(ll).addTo(map);
-  $("stop-name").textContent = p.name;
+function openPanel() {
+  $("stop-name").textContent = "";
   $("stop-body").innerHTML = `<p class="muted">Loading…</p>`;
   $("stop").hidden = false;
   document.body.classList.add("stop-open");
-  const idx = await cached(`data/schedule/${$("day").value}/stops.json`, Infinity);
-  if (stopOpen === p) setFocus(p.codes.flatMap(c => idx?.stops[c] ?? []));
+  busRing ??= L.circleMarker([0, 0], { pane: "trails", radius: 30, weight: 3, fill: false, interactive: false });
+  busRing.setStyle({ color: css("--focus") });
 }
-function closeStop() {
-  stopOpen = null;
+// On phones the panel covers the top of the map; if the clicked bus or stop
+// is under it, slide the map so it sits in the clear area below.
+function reveal(ll) {
+  if (innerWidth > 720 || !ll) return;
+  // The panel's full height (max-height 55vh), not its height while loading.
+  const under = 14 + innerHeight * .55, h = map.getSize().y;
+  const y = map.latLngToContainerPoint(ll).y, want = under + (h - 180 - under) / 2;
+  if (y < under + 30) map.panBy([0, y - want], { animate: false });
+}
+function closePanel() {
+  stopOpen = busOpen = null;
   $("stop").hidden = true;
   document.body.classList.remove("stop-open");
   if (stopMark) map.removeLayer(stopMark);
+  if (busRing) map.removeLayer(busRing);
 }
-$("stop-x").onclick = () => { closeStop(); setFocus([]); };
+$("stop-x").onclick = () => { closePanel(); setFocus([]); };
+function renderPanel() {
+  if (stopOpen) renderStop();
+  else if (busOpen) renderBus();
+}
+
+// p: a stop feature's properties ({stop, code}) or a transit center's
+// {stop, codes}.
+async function showStop(props, ll) {
+  closePanel();
+  const p = stopOpen = { name: props.stop, codes: props.codes ?? (props.code ? [props.code] : []) };
+  openPanel();
+  (stopMark ??= L.circleMarker(ll, { radius: 11, weight: 3, fill: false, interactive: false }))
+    .setLatLng(ll).addTo(map);
+  $("stop-name").textContent = p.name;
+  reveal(ll);
+  const idx = await cached(`data/schedule/${$("day").value}/stops.json`, Infinity);
+  if (stopOpen === p) setFocus(p.codes.flatMap(c => idx?.stops[c] ?? []));
+}
 
 async function renderStop() {
-  if (!stopOpen) return;
-  const p = stopOpen, token = ++stopRender, day = $("day").value, f = current();
+  const p = stopOpen, token = ++panelRender, day = $("day").value, f = current();
   if (!p.codes.length) {
     $("stop-body").innerHTML = `<p class="muted">This map's stop list is out of date. Reload the page.</p>`;
     return;
@@ -492,7 +547,7 @@ async function renderStop() {
       const [trip, head] = sch.trips[i], due = sch.t0 + s, a = came[trip + " " + c], v = onTrip[trip];
       heads.add(head.trim());
       if (a) rows.push({ due, at: a.t, past: true });
-      else if (v && v.delay_seconds != null) rows.push({ due, at: due + v.delay_seconds, expected: true });
+      else if (v && v.delay_seconds != null) rows.push({ due, at: Math.max(due + v.delay_seconds, now), expected: true });
       else rows.push({ due, past: due < now });
     }
     const when = (r) => r.at ?? r.due;
@@ -501,16 +556,159 @@ async function renderStop() {
     const td = (r) => `<td>${r.due ? hm(r.due) : "<small>unscheduled</small>"}</td>` +
       (r.at == null ? `<td class="muted">${r.past ? "not seen" : ""}</td><td></td>`
         : `<td>${r.expected ? "~" : ""}${hm(r.at)}</td><td>${r.due ? badge(r.at - r.due) : ""}</td>`);
-    return `<div class="rt"><div><span class="chip">${route}</span><span>to ${[...heads].join(" / ")}</span></div>
+    return `<div class="rt"><div><span class="chip">${route}</span><span>to ${esc([...heads].join(" / "))}</span></div>
       <table><tr><th>Scheduled</th><th>Arrived / expected</th><th>min</th></tr>
       ${past.map(r => `<tr class="past">${td(r)}</tr>`).join("")}
       <tr class="now"><td colspan="3"></td></tr>
       ${next.map(r => `<tr>${td(r)}</tr>`).join("") || `<tr><td colspan="3" class="muted">no more trips today</td></tr>`}
       </table></div>`;
   }));
-  if (token !== stopRender || stopOpen !== p) return;   // a newer render won
+  if (token !== panelRender || stopOpen !== p) return;   // a newer render won
   $("stop-body").innerHTML = parts.join("") ||
     `<p class="muted">${idx ? "No scheduled service here on this day." : "No timetable for this day yet."}</p>`;
+}
+
+// Each trip's calls in order, [[seconds after t0, stop code], ...], and trip
+// id -> index; built once per route file.
+function tripIndex(sch) {
+  if (sch.calls) return sch;
+  sch.calls = sch.trips.map(() => []);
+  for (const code in sch.stops) for (const [s, i] of sch.stops[code]) sch.calls[i].push([s, code]);
+  for (const c of sch.calls) c.sort((a, b) => a[0] - b[0]);
+  sch.byTrip = Object.fromEntries(sch.trips.map(([trip], i) => [trip, i]));
+  return sch;
+}
+
+async function renderBus() {
+  const id = busOpen, token = ++panelRender, day = $("day").value, f = current();
+  const v = f?.v.find(x => x.vehicle_id === id);
+  if (!v) {
+    $("stop-name").textContent = "Bus";
+    $("stop-body").innerHTML = `<p class="muted">Not in service at this moment.</p>`;
+    return;
+  }
+  const now = f.t, route = v.route_id;
+  const [sch0, arr] = await Promise.all([
+    cached(`data/schedule/${day}/${route}.json`, Infinity),
+    cached(`data/arrivals/${day}/${route}.jsonl`, ARRIVALS_TTL, true)]);
+  if (token !== panelRender || busOpen !== id) return;
+  const sch = sch0 && tripIndex(sch0);
+  const dueAt = (trip, code) => {
+    const i = sch?.byTrip[trip];
+    const c = i == null ? null : sch.calls[i].find(([, cd]) => cd === code);
+    return c ? sch.t0 + c[0] : null;
+  };
+  // Last SHOW stops this bus served on its current route, within the last
+  // 90 min (older ones mean a gap in logging, not where it's been).
+  const mine = (arr ?? []).filter(a => a.vehicle === id && a.t <= now && a.t > now - RECENT_S);
+  const prior = mine.slice(-SHOW).map(a => ({ code: a.stop, at: a.t, due: a.trip ? dueAt(a.trip, a.stop) : null }));
+  // Its trip: live, the poller's match; replaying, its latest arrival's.
+  const trip = v.trip_id ?? mine.at(-1)?.trip;
+  const ti = sch && trip ? sch.byTrip[trip] : null, calls = ti == null ? [] : sch.calls[ti];
+  const delay = v.delay_seconds != null && !v.delay_capped ? v.delay_seconds : null;
+  // Where it is on that trip: live, its next stop by name (the call nearest
+  // in time if the name repeats); otherwise just past its latest arrival.
+  let k = -1;
+  if (v.next_stop_name) {
+    let best = Infinity;
+    calls.forEach(([s, code], j) => {
+      if (stopName[code] !== v.next_stop_name) return;
+      const off = Math.abs(sch.t0 + s + (delay ?? 0) - now);
+      if (off < best) { best = off; k = j; }
+    });
+  }
+  if (k < 0 && mine.length && mine.at(-1).trip === trip) {
+    const last = mine.at(-1), j = calls.findIndex(([s, code]) => code === last.stop);
+    if (j >= 0) k = j + 1;
+  }
+  const next = k < 0 ? [] : calls.slice(k, k + SHOW).map(([s, code]) => {
+    const due = sch.t0 + s;
+    return { code, due, at: delay == null ? null : Math.max(due + delay, now), expected: true };
+  });
+
+  const head = v.destination?.trim() || (ti != null ? sch.trips[ti][1].trim() : "");
+  $("stop-name").innerHTML = `<span class="chip">${esc(route)}</span>${head ? "to " + esc(head) : ""}`;
+  const facts = [v.equipment_no && `${TROLLEY.has(route) ? "trolley" : "bus"} ${esc(v.equipment_no)}`,
+    esc(delayText(v)), v.occupancy_pct != null && `${v.occupancy_pct}% full`].filter(Boolean);
+  const row = (r, cls) => `<tr class="${cls}"><td>${esc(stopName[r.code] ?? r.code)}` +
+    `<small class="muted">${r.due ? "sched " + hm(r.due) : "unscheduled"}</small></td>` +
+    `<td>${r.at == null ? "" : (r.expected ? "~" : "") + hm(r.at)}</td>` +
+    `<td>${r.at != null && r.due ? badge(r.at - r.due) : ""}</td></tr>`;
+  const html = `<div class="sub">${facts.join(" &middot; ")}</div>
+    <table><tr><th>Stop</th><th>Arrived / expected</th><th>min</th></tr>
+    ${prior.map(r => row(r, "past")).join("") || `<tr><td colspan="3" class="muted">no stops recorded yet</td></tr>`}
+    <tr class="now"><td colspan="3"></td></tr>
+    ${next.map(r => row(r, "")).join("") || `<tr><td colspan="3" class="muted">${sch ? "next stops unknown" : "no timetable for this day"}</td></tr>`}
+    </table>
+    <h3>Delay, last ${CHART_H} hours</h3><div class="chart"></div>`;
+  $("stop-body").innerHTML = html;
+  delayChart($("stop-body").querySelector(".chart"), id, now);
+}
+
+// Minutes late over the last CHART_H hours, from the replay frames: one 2 px
+// line in the delay-tier colors (above 0 = late, below = early), guides at
+// 0 and the tier thresholds, and a crosshair that snaps to the nearest
+// reading. "1h+" readings are floors, not values: left as gaps.
+function delayChart(el, id, now) {
+  const from = now - CHART_H * 3600, pts = [];
+  for (const fr of frames) {
+    if (fr.t < from || fr.t > now) continue;
+    const v = fr.v.find(x => x.vehicle_id === id);
+    if (v) pts.push({ t: fr.t, d: v.delay_capped || v.delay_seconds == null ? null : v.delay_seconds / 60 });
+  }
+  const cur = current()?.v.find(x => x.vehicle_id === id);
+  if (cur && (!pts.length || pts.at(-1).t < now))
+    pts.push({ t: now, d: cur.delay_capped || cur.delay_seconds == null ? null : cur.delay_seconds / 60 });
+  const vals = pts.filter(p => p.d != null).map(p => p.d);
+  if (!vals.length) { el.innerHTML = `<p class="muted">No delay readings yet.</p>`; return; }
+
+  const W = Math.max(el.clientWidth, 240), H = 150, L0 = 38, B = 24, T = 10;
+  const lo = Math.min(-5, Math.floor(Math.min(...vals))), hi = Math.max(10, Math.ceil(Math.max(...vals)));
+  const x = (t) => L0 + (t - from) / (now - from) * (W - L0 - 4);
+  const y = (d) => T + (hi - d) / (hi - lo) * (H - T - B);
+  // Guides: 0 solid, thresholds dashed, labels kept 18 px apart.
+  let guides = "", lastY = -99;
+  for (const g of [hi, 20, 10, 5, 0, -5, lo].filter((g, i, a) => g <= hi && g >= lo && a.indexOf(g) === i).sort((a, b) => b - a)) {
+    const gy = y(g), label = Math.abs(gy - lastY) >= 18 || g === 0;
+    if (g === 0 || [5, 10, 20].includes(g))
+      guides += `<line x1="${L0}" x2="${W - 4}" y1="${gy}" y2="${gy}" stroke="var(--${g === 0 ? "muted" : "hairline"})" stroke-width="1" ${g ? 'stroke-dasharray="3 4"' : ""}/>`;
+    if (label) { guides += `<text x="${L0 - 6}" y="${gy + 5}" text-anchor="end">${g > 0 ? "+" + g : g}</text>`; lastY = gy; }
+  }
+  // The line, split where the tier changes or readings stop (gap > 3 min).
+  let lines = "", seg = [], segTier = null;
+  const flush = () => { if (seg.length > 1) lines += `<polyline points="${seg.join(" ")}" fill="none" stroke="var(--${segTier})" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`; };
+  pts.forEach((p, i) => {
+    const prev = pts[i - 1];
+    if (p.d == null || (prev && p.t - prev.t > 180)) { flush(); seg = []; segTier = null; if (p.d == null) return; }
+    const t = tier({ delay_seconds: p.d * 60 }), pt = `${x(p.t).toFixed(1)},${y(p.d).toFixed(1)}`;
+    if (t !== segTier) { flush(); seg = seg.length ? [seg.at(-1)] : []; segTier = t; }
+    seg.push(pt);
+  });
+  flush();
+  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="Delay over the last ${CHART_H} hours, now ${esc(cur ? delayText(cur) : "")}">
+    ${guides}${lines}
+    <text x="${L0}" y="${H - 4}">${hm(from)}</text><text x="${W - 4}" y="${H - 4}" text-anchor="end">${hm(now)}</text>
+    <line class="xh" y1="${T}" y2="${H - B}" stroke="var(--ink-2)" stroke-width="1" visibility="hidden"/>
+    <circle class="dot" r="4" fill="var(--ink)" stroke="var(--surface)" stroke-width="2" visibility="hidden"/>
+    <rect x="${L0}" y="0" width="${W - L0}" height="${H - B}" fill="transparent"/></svg><div class="tip" hidden></div>`;
+  const svg = el.querySelector("svg"), xh = svg.querySelector(".xh"), dot = svg.querySelector(".dot"), tipEl = el.querySelector(".tip");
+  const shown = pts.filter(p => p.d != null);
+  const hover = (e) => {
+    const mx = e.clientX - svg.getBoundingClientRect().left;
+    const p = shown.reduce((a, b) => Math.abs(x(b.t) - mx) < Math.abs(x(a.t) - mx) ? b : a);
+    const px = x(p.t), m = Math.round(p.d);
+    xh.setAttribute("x1", px); xh.setAttribute("x2", px); xh.setAttribute("visibility", "visible");
+    dot.setAttribute("cx", px); dot.setAttribute("cy", y(p.d)); dot.setAttribute("visibility", "visible");
+    tipEl.hidden = false;
+    tipEl.innerHTML = "<b></b> <span class=\"muted\"></span>";
+    tipEl.firstChild.textContent = m === 0 ? "on time" : `${Math.abs(m)} min ${m < 0 ? "early" : "late"}`;
+    tipEl.lastChild.textContent = hm(p.t);
+    tipEl.style.left = Math.min(Math.max(px - tipEl.offsetWidth / 2, 0), W - tipEl.offsetWidth) + "px";
+    tipEl.style.top = "-34px";
+  };
+  svg.addEventListener("pointermove", hover);
+  svg.addEventListener("pointerdown", hover);
+  svg.addEventListener("pointerleave", () => { xh.setAttribute("visibility", "hidden"); dot.setAttribute("visibility", "hidden"); tipEl.hidden = true; });
 }
 
 // --- Live ------------------------------------------------------------------
