@@ -1,5 +1,6 @@
 """
 CADAVL (MATA SWIV) -> position history, live snapshot, GTFS-Realtime feed.
+Also archives MATA's official GTFS-RT feeds (official_feed.py).
 
 Mapping verified against a real /topo/vehicules payload (41 buses, 20 lines).
 
@@ -25,6 +26,7 @@ from pathlib import Path
 import requests
 from google.transit import gtfs_realtime_pb2
 
+from official_feed import Official
 from schedule import Schedule
 
 # --------------------------------------------------------------------------
@@ -380,6 +382,7 @@ def run_poller() -> None:
     stale = StaleTracker()
     trails = Trails()
     schedule = Schedule()
+    official = Official()
     polls = 0
     topo_checked = 0
 
@@ -416,6 +419,12 @@ def run_poller() -> None:
             write_atomic(FEED_PATH, build_feed(rows, fetched_at).SerializeToString())
             print(f"{len(rows)} vehicles, "
                   f"{sum(r['unchanged_polls'] == 0 for r in rows)} moved")
+
+            # Last, so a slow official feed never delays latest.json.
+            try:
+                official.update(session, fetched_at)
+            except Exception as exc:    # an extra archive; never lose a poll to it
+                print(f"official feed archive failed: {exc!r}")
 
         except (requests.RequestException, OSError) as exc:
             # OSError covers Windows refusing to replace latest.json while

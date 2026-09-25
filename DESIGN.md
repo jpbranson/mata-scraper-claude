@@ -30,6 +30,26 @@ live in the docstrings of the scripts.
 | `/iv/message` | Rider-facing alert text | small | Optional detour overlay |
 | `/horaires/pta/<stop id>` | The tracker's own stop popup: next one or two times per route | small | Nothing (no CORS, so the page can't call it; kept as a cross-check) |
 | `gtfs.mata.cadavl.com/MATA/GTFS/GTFS_MATA.zip` | MATA's published timetable (GTFS), same vendor | ~1.5 MB, rebuilt nightly | Stop schedules and trip matching (`schedule.py`) |
+| `gtfsrt.mata.cadavl.com/ProfilGtfsRt2_0RSProducer-MATA/{VehiclePosition,TripUpdate,Alert}.pb` | MATA's official GTFS-Realtime, same vendor | ~3 KB / ~120 KB / ~1 KB, rebuilt every 30 s | Archived beside our history (`official_feed.py`) |
+
+The official GTFS-RT feed isn't linked from matatransit.com (found via
+Transitland, 2026-09-25); it's presumably what GO901, Transit and Google
+Maps show. Compared live with the tracker, it has what the tracker lacks,
+and lacks what our three questions need:
+
+| | Official GTFS-RT | Tracker (`/topo/vehicules`) |
+|---|---|---|
+| Vehicle ID | Fleet number (`equipment_no`) | Vendor ID and fleet number |
+| Trip | `trip_id` from the timetable | None; `schedule.py` infers it (agreed 27 of 27) |
+| Timestamp | Each bus's report time | None |
+| Freshness | Positions ~1 min old | Every 10 s |
+| Load | Category (`FEW_SEATS_AVAILABLE`) | Percent |
+| Delay | None; predicted times per stop | The vendor's "5 min late" |
+| Missed service | `CANCELED` trips; alerts like "Route 50 is not running from Exeter @ Poplar at 5:30a" | None |
+
+The predictions don't reproduce the tracker's delay (next-stop prediction
+− timetable ranged from 9 min more to 10 min less than the tracker's
+figure, 27 buses at 05:30), so the tracker stays the source for positions, delay and load.
 
 The GTFS feed lines up with the tracker exactly: GTFS `stop_id` is `"0:"` +
 the tracker's stop code (`mnemoPointArret`, `stop_code` in `stops.csv`),
@@ -38,13 +58,16 @@ the tracker's stop code (`mnemoPointArret`, `stop_code` in `stops.csv`),
 against this timetable (checked: a bus "8 min late" at LAMAR @LAPALOMA at
 18:01 is the 17:52:59 trip).
 
-Known limits of the vehicle payload, which shape the design:
+Known limits of the tracker's vehicle payload, which shape the design
+(the official feed fills the first two, in its own archive, not in our
+rows):
 
 - **No server timestamp.** `observed_at` is *our* fetch time. A bus whose
   coordinates don't change across many polls is a dropped GPS feed (a "ghost"),
   not a parked bus; `unchanged_polls` counts that.
 - **No trip or block ID.** We know the route and headsign, not which scheduled
-  trip a bus is on; `schedule.py` infers it (see below). Delay is whatever
+  trip a bus is on; `schedule.py` infers it (see below), and the official
+  feed's `trip_id` is there to check it against. Delay is whatever
   the vendor reports (`avanceRetard`), not something we compute. The GTFS
   timetable does carry `block_id`, and a few blocks interline: weekday
   blocks 4001 and 4002 (and their weekend twins) alternate a route 13 round
@@ -54,7 +77,9 @@ Known limits of the vehicle payload, which shape the design:
 - **Buses leave the feed at layovers.** At the end of a line a bus often
   drops out of the payload for 5–25 minutes and comes back on its return
   trip (bus 10015 at Walnut @ Racine: 20:10–20:19). Those gaps are in the
-  history too; they're most of the breaks in the map's delay chart.
+  history too; they're most of the breaks in the map's delay chart. The
+  official feed keeps such a bus, parked at its next trip's first stop
+  (see Official feed below).
 - **Delay is capped.** `"1h+ late"` / `"1h+ early"` mean "at least an hour",
   stored as ±3600 and flagged `delay_capped`. Those rows are usually
   misassigned buses; exclude them. (Pollers before 2026-09-24 stored them as
@@ -79,8 +104,10 @@ Known limits of the vehicle payload, which shape the design:
                                       ├─▶ data/latest.json                                  current snapshot
                                       ├─▶ data/replay/YYYY-MM-DD.jsonl                       one frame per 30 s, for replay
                                       ├─▶ data/schedule/YYYY-MM-DD/, data/arrivals/YYYY-MM-DD/  timetable + when buses came (schedule.py)
+                                      ├─▶ data/official/dt=YYYY-MM-DD/                      official GTFS-RT archive (official_feed.py)
                                       └─▶ data/vehicle_positions.pb                         GTFS-RT feed
  GTFS_MATA.zip ── once a day ──▶ poller (schedule.py)
+ official GTFS-RT ── every 30 s (trip updates every 5 min) ──▶ poller (official_feed.py)
  /topo ── when line IDs change ──▶ poller (build_crosswalk.py) ──▶ routes.csv, stops.csv, network.geojson
 
  map.html  ── data/latest.json every 10 s + the day's replay file + stop files on click ──▶  live map, replay, stop times  (served by python -m http.server)
@@ -91,7 +118,8 @@ Known limits of the vehicle payload, which shape the design:
 ```
 
 Five files do the work: the poller, its timetable module, the map page,
-the SQL file, and the crosswalk builder. Everything else in the repo is
+the SQL file, and the crosswalk builder. The poller's other module,
+`official_feed.py`, only archives. Everything else in the repo is
 optional, a one-off tool (`backfill_replay.py`, `backfill_routes.py`, `cadavl_detours.py`,
 `probe_cadence.py`), or one of the two extra views (`strips.html`,
 `schematic.html`, sharing `transit.js` and `pages.css`, with
@@ -141,10 +169,47 @@ existed, after any gap, or to bring old frames up to the current format.
 Each page loads the viewed day's file once; it drives the replay scrubber
 (and on the map, the trails while replaying).
 
-**GTFS-RT — `data/vehicle_positions.pb`.** Already implemented; ~30 lines and
-one dependency. Kept because it is the standard interchange format, but
-nothing in this project consumes it. Delete it and `gtfs-realtime-bindings`
-if it ever gets in the way.
+**GTFS-RT — `data/vehicle_positions.pb`.** Already implemented; ~30 lines.
+Nothing in this project consumes it, and MATA publishes an official
+GTFS-RT feed anyway (see Data source); ours is fresher but has no trip IDs.
+Delete it if it ever gets in the way (`gtfs-realtime-bindings` stays, for
+`official_feed.py`).
+
+**Official feed — `official_feed.py`.** Every poll, `Official.update`
+fetches MATA's own GTFS-RT vehicle positions and alerts (two small
+requests), and every 5 minutes its trip updates, and appends any snapshot
+it hasn't saved (by header timestamp) to `data/official/dt=<UTC day>/`,
+flattened to rows (see Data model). Trip updates every 30 s would be
+~150 MB a day of mostly repeated predictions, hence 5 minutes; alerts are
+saved only when they change. It is an archive only — nothing reads it
+yet — kept for what the tracker can't give: trip IDs to check
+`schedule.py`'s against, report timestamps, cancelled trips and
+missed-trip alerts, and the predictions riders saw. ~15–25 MB a day,
+estimated from early-morning snapshots. A failure is logged and never
+costs a poll. `python official_feed.py` fetches each feed once and prints
+a row.
+
+Checked with MobilityData's GTFS-RT validator (2026-09-25, 13 snapshots
+of each feed against `GTFS_MATA.zip`): every trip and stop ID resolves,
+no stale feeds, one trivial error (two consecutive stops of one trip
+predicted at the same second). What its warnings mean for analysis:
+
+- **Only trips with a `vehicle_id` carry real predictions.** Trips no bus
+  has started yet are listed with the timetable's times unchanged
+  (predicted − scheduled is exactly 0). Filter on `vehicle_id` before
+  judging prediction accuracy, or the copies make it look perfect.
+- **The official positions include buses at layover.** A bus waiting at
+  the first stop of its next trip (11 of 34 at 06:10) is in
+  `vehicles.jsonl.gz` with that trip's ID, while the tracker drops it and
+  its trip update has no vehicle yet. That fills most of the layover gaps
+  in our own history.
+- **Trip updates carry no per-trip timestamp**; use `feed_ts`.
+
+The validator's static check reported ~14,000 problems, nearly all false
+(it claims every trip and 7,588 stops lack coordinates; they don't). Real
+but harmless: `stops.txt` lists nearly every stop twice, under `0:`
+(3,849) and `1:` (3,739) prefixes, and 3,988 are used by no trip. We
+only use `0:` IDs.
 
 The `idLigne → route` mapping and colors are loaded from `routes.csv` at
 startup (`load_routes`). When a poll has buses on lines it doesn't know
@@ -417,13 +482,28 @@ queries rather than renaming partitions).
 | `unchanged_polls` | int | Consecutive polls with identical coordinates; ghost signal |
 | `trip_id` | str | GTFS trip the bus is inferred to be running; null if unmatched (from 2026-09-24) |
 
+The official feed's archive, from 2026-09-25, is in
+`data/official/dt=YYYY-MM-DD/` (UTC date of `feed_ts`, the feed header's
+time). Enum values are the GTFS-RT names (`SCHEDULED`, `CANCELED`,
+`IN_TRANSIT_TO`, `FEW_SEATS_AVAILABLE`, …); times are Unix seconds.
+
+| File | One row per | Fields |
+|---|---|---|
+| `vehicles.jsonl.gz` | bus per snapshot (30 s) | `feed_ts`, `reported_at`, `vehicle_id` (fleet number), `trip_id`, `route_id`, `trip_status`, `lat`, `lon`, `bearing`, `speed` (m/s by the spec), `stop_id` (GTFS, `0:<stop code>`), `stop_status`, `occupancy` |
+| `trip_updates.jsonl.gz` | trip per snapshot (5 min) | `feed_ts`, `trip_id`, `route_id`, `trip_status`, `vehicle_id` (null until a bus is assigned), `stops`: list of `{seq, stop_id, arrival, departure, status}` |
+| `alerts.jsonl.gz` | snapshot whose alerts changed | `feed_ts`, `alerts`: list of `{id, routes, stops, active: [[start, end]], cause, effect, header, description}`; an empty list means none |
+
+DuckDB reads the lists with `unnest`. Every cancelled trip:
+`SELECT DISTINCT route_id, trip_id FROM read_json_auto('data/official/*/trip_updates.jsonl.gz') WHERE trip_status = 'CANCELED'`.
+
 ## Running it
 
 An always-on Windows machine at home. Chosen over the cloud free tiers:
 Google's e2-micro is free but its external IP is ~$3.65/month, Oracle's is
 $0 but has signup and idle-reclamation caveats, and a home box costs a few
-dollars a year in power. Needs are tiny: one 12 KB request every 10 s,
-~25–30 MB/day of disk (history plus replay frames).
+dollars a year in power. Needs are tiny: one 12 KB request every 10 s
+(plus the official feed's two of ~2 KB, and ~120 KB every 5 minutes),
+~40–55 MB/day of disk (history, replay frames, official archive).
 
 Everything runs natively (Python, `http.server`, DuckDB); only "keep it
 running" is Windows-specific, and Task Scheduler does that. Install once
@@ -489,6 +569,8 @@ Failure modes and the response to each:
   (`backfill_routes.py`) and rebuilds the replay and arrivals files.
 - GTFS feed down → the cached `data/gtfs.zip` is used; with none, stop
   panels say there's no timetable and everything else carries on.
+- Official GTFS-RT down → logged per feed; its archive has a gap and
+  nothing else notices.
 - Vendor changes the JSON shape → `normalize_vehicle` returns nothing useful;
   the `--sample` check against a freshly saved payload is the debugging tool.
 
@@ -518,7 +600,10 @@ Steps 1–4 are done. Each left the project working; net line count went down.
   before trusting it.
 - **Late threshold.** Five minutes is the usual transit-industry cutoff for
   "late". Adjust if MATA publishes its own on-time standard.
-- **Speed unit.** Only matters if the GTFS-RT feed gets a consumer.
+- **Speed unit.** Only matters if our GTFS-RT feed gets a consumer. The
+  official feed reports speed for the same buses (m/s by the spec; match
+  on fleet number), so pairing the two archives could settle it without
+  `probe_cadence.py`.
 
 ## Non-goals
 
