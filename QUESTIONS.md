@@ -18,7 +18,9 @@ bunching / headways and where delay accumulates.
   congestion from "always".
 - **Does delay recover or compound?** Follow one bus through a run: does a bus
   5 min late at the start end 5 min late or 15? Wrong schedules vs buses
-  getting stuck.
+  getting stuck. A run ends where the route or headsign changes: buses on
+  routes 13 and 40 alternate between them all day (GTFS blocks 4001/4002),
+  and the delay resets at each handoff.
 - **Early running.** Negative `delay_seconds`. Leaving early is worse for
   riders than a few minutes late and is invisible in on-time percentages.
 
