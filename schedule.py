@@ -12,7 +12,8 @@ The poller calls `Schedule.update` every poll. Per local service day it
 writes, for map.html's stop panel:
 
     data/schedule/<day>/stops.json      stop code -> routes scheduled there
-    data/schedule/<day>/<route>.json    that route's scheduled times per stop
+    data/schedule/<day>/<route>.json    that route's scheduled times per stop,
+                                        and its stop patterns (below)
     data/arrivals/<day>/<route>.jsonl   each time a bus served a stop
 
 A bus has served stop A when its next stop changes away from A. Which
@@ -30,10 +31,11 @@ import json
 import math
 import zipfile
 from bisect import bisect_left
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import date, datetime
 from email.utils import formatdate
 from pathlib import Path
+from statistics import median
 
 import requests
 
@@ -90,29 +92,34 @@ class Timetable:
                 return csv.DictReader(io.TextIOWrapper(z.open(name), "utf-8-sig"))
 
             services = self._services(rows("calendar.txt"), rows("calendar_dates.txt"))
-            all_trips = {r["trip_id"]: (r["route_id"], r["trip_headsign"].strip(), r["service_id"])
+            all_trips = {r["trip_id"]: (r["route_id"], r["trip_headsign"].strip(), r["service_id"],
+                                        r.get("direction_id", ""))
                          for r in rows("trips.txt")}
+            # trip -> [(stop_sequence, code, seconds, timepoint)], for patterns.
+            calls: dict[str, list] = defaultdict(list)
             # (route, headsign, stop code) -> [(unix time due, trip_id)], today only.
             self.due: dict[tuple, list] = defaultdict(list)
             # Every stop each route + direction calls at, any day: name lookup
             # still works on a day the feed has no service for.
             pattern: set[tuple] = set()
             for r in rows("stop_times.txt"):
-                route, head, service = all_trips.get(r["trip_id"], (None, None, None))
+                route, head, service, _ = all_trips.get(r["trip_id"], (None,) * 4)
                 if route is None:
                     continue
                 code = r["stop_id"].split(":", 1)[-1]
                 pattern.add((route, head, code))
+                h, m, s = map(int, r["arrival_time"].split(":"))
+                secs = h * 3600 + m * 60 + s
+                calls[r["trip_id"]].append((int(r["stop_sequence"]), code, secs, r.get("timepoint") == "1"))
                 if service in services:
-                    h, m, s = map(int, r["arrival_time"].split(":"))
-                    self.due[(route, head, code)].append(
-                        (self.t0 + h * 3600 + m * 60 + s, r["trip_id"]))
+                    self.due[(route, head, code)].append((self.t0 + secs, r["trip_id"]))
         for times in self.due.values():
             times.sort()
-        self.headsign = {t: head for t, (_, head, _) in all_trips.items()}
+        self.headsign = {t: head for t, (_, head, _, _) in all_trips.items()}
 
         with STOPS_CSV.open(encoding="utf-8") as fh:
             stops = {r["stop_code"]: r for r in csv.DictReader(fh)}
+        self.patterns = self._patterns(all_trips, calls, services, stops)
         # (route, headsign, stop name as the tracker spells it) -> [(code, lat, lon)]
         self.by_name: dict[tuple, list] = defaultdict(list)
         for route, head, code in pattern:
@@ -120,6 +127,46 @@ class Timetable:
             if s and s["lat"]:
                 self.by_name[(route, head, s["stop_name"])].append(
                     (code, float(s["lat"]), float(s["lon"])))
+
+    @staticmethod
+    def _patterns(all_trips: dict, calls: dict, services: set, stops: dict) -> dict[str, list]:
+        """Per route, the stop patterns its trips run: for each headsign, every
+        stop sequence carrying at least a fifth (and 3) of its trips that is
+        a real branch, sharing under 80% of its stops with the ones already
+        kept (counting today's trips, or any day's if none run today). So
+        route 39's two ways into William Hudson are two patterns, while
+        route 36's variants a few stops apart stay one. Each
+        stop has its name, position, median seconds from the first stop, and
+        whether it is a timepoint (the timetable's major stops). For the strip
+        and schematic pages, which place buses along these."""
+        seqs: dict[tuple, Counter] = defaultdict(Counter)
+        offsets: dict[tuple, list] = defaultdict(list)
+        for trip, cs in calls.items():
+            route, head, service, direction = all_trips[trip]
+            cs.sort()
+            key = tuple((c[1], c[3]) for c in cs)
+            seqs[(route, head, direction)][(service in services, key)] += 1
+            offsets[(route, head, key)].append([c[2] - cs[0][2] for c in cs])
+        out: dict[str, list] = defaultdict(list)
+        for (route, head, direction), counts in sorted(seqs.items()):
+            today = any(on for on, _ in counts)
+            ranked = sorted(((n, key) for (on, key), n in counts.items() if on == today), reverse=True)
+            total = sum(n for n, _ in ranked)
+            kept: list[set] = []
+            for n, key in ranked:
+                codes = {c for c, _ in key}
+                if kept and (n < max(3, total / 5) or any(
+                        len(codes & k) / len(codes | k) >= .8 for k in kept)):
+                    continue
+                kept.append(codes)
+                mins = [median(o) for o in zip(*offsets[(route, head, key)])]
+                out[route].append({"head": head, "dir": direction, "trips": n, "stops": [
+                    [code, stops.get(code, {}).get("stop_name", code),
+                     round(float(stops[code]["lat"]), 5) if code in stops else None,
+                     round(float(stops[code]["lon"]), 5) if code in stops else None,
+                     round(off), int(tp)]
+                    for (code, tp), off in zip(key, mins)]})
+        return out
 
     def _services(self, calendar, calendar_dates) -> set[str]:
         ymd = self.day.strftime("%Y%m%d")
@@ -170,7 +217,8 @@ class Timetable:
             for times in r["stops"].values():
                 times.sort()
             (out / f"{route}.json").write_text(json.dumps(
-                {"t0": self.t0, **r}, separators=(",", ":")))
+                {"t0": self.t0, **r, "patterns": self.patterns.get(route, [])},
+                separators=(",", ":")))
         (out / "stops.json").write_text(json.dumps(
             {"t0": self.t0, "stops": {c: sorted(rs) for c, rs in at_stop.items()}},
             separators=(",", ":")))

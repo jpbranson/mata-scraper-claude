@@ -75,14 +75,18 @@ Known limits of the vehicle payload, which shape the design:
  /topo ── when line IDs change ──▶ poller (build_crosswalk.py) ──▶ routes.csv, stops.csv, network.geojson
 
  map.html  ── data/latest.json every 10 s + the day's replay file + stop files on click ──▶  live map, replay, stop times  (served by python -m http.server)
+ strips.html, schematic.html ── data/latest.json every 10 s + route files ──▶  route strips, subway-style map
+ schematic.json ── built by build_schematic.py with LOOM (occasionally, on Linux/WSL) ──▶  the schematic layout
  analysis.sql ── DuckDB reads data/positions/*/*.jsonl.gz ──▶  the three questions
  routes.csv / stops.csv / network.geojson ── built by build_crosswalk.py ──▶  names, colors, route lines
 ```
 
 Five files do the work: the poller, its timetable module, the map page,
 the SQL file, and the crosswalk builder. Everything else in the repo is
-optional or a one-off tool (`backfill_replay.py`, `cadavl_detours.py`,
-`probe_cadence.py`).
+optional, a one-off tool (`backfill_replay.py`, `cadavl_detours.py`,
+`probe_cadence.py`), or one of the two extra views (`strips.html`,
+`schematic.html`, sharing `transit.js` and `pages.css`, with
+`build_schematic.py` making the schematic's layout).
 
 ## Components
 
@@ -145,8 +149,12 @@ than `data/gtfs.zip`, loads today's trips, and writes for the map:
   (from the timetable, not `/topo`, which lists lines that pass without
   stopping).
 - `data/schedule/<day>/<route>.json` — that route's trips (id, headsign)
-  and, per stop, seconds after local midnight (`t0`). 25 files, ~0.8 MB
-  a day.
+  and, per stop, seconds after local midnight (`t0`); plus its stop
+  `patterns`: per headsign, each stop sequence that is a real branch
+  (≥ a fifth of its trips and sharing < 80% of stops with the main one:
+  route 36 via Lamar or via Kimball), stops in order with name, position,
+  median seconds from the first stop, and timepoint flag. 25 files,
+  ~1 MB a day.
 
 Every poll it then does two matches:
 
@@ -245,7 +253,50 @@ the OS setting.
 
 Served by `python -m http.server` from the repo root — browsers block
 `fetch()` on `file://` URLs, so a server is required, but that one command
-is all of it.
+is all of it. The legend links to the two views below, and a bus's panel
+to its route's strip.
+
+### 3b. Route strips and schematic — `strips.html`, `schematic.html`
+
+Two more views of the same live data, each with page links, a live clock
+and a row of route chips (live bus count on each; one sideways-scrolling
+row on phones). Both place a bus along its route's stop pattern the same
+way (`transit.js`, `locate`): the pattern for its headsign, its next stop
+by name (nearest if the name repeats; other patterns if its branch's
+isn't the main one), and the fraction between that stop and the one
+before by distance. Delay colors are the map's tiers.
+
+**Strips** (`strips.html#36`): one vertical strip per pattern of the
+chosen route, stops top to bottom in travel order, evenly spaced and all
+named (timepoints bold with a big dot), like the line diagram over a
+subway door. Buses sit on the line with a chevron for direction; beside
+each, its delay, fleet number and the gap to the bus ahead in scheduled
+minutes — bunching and holes read at a glance. Labels shift down rather
+than overlap. Branches with the same headsign say "via" their first stop
+the others lack.
+
+**Schematic** (`schematic.html#36`): the whole network as a subway map,
+drawn with Leaflet on a flat (`CRS.Simple`) plane from `schematic.json`.
+Stations are the timetable's timepoints, merged where LOOM merged them
+(246 → 143); segments are at 45°/90°; routes that share a street run as
+parallel lanes in LOOM's crossing-minimising order. Lines are one neutral
+ink so color stays with the buses; route numbers mark each route's ends;
+click a line, a bus or a chip to pick a route out (others fade). Lanes
+keep a fixed pixel spacing (5 px, halved at a phone's whole-network zoom),
+so the offsets are recomputed on zoom. Labels: the transit centers at
+overview, every station from zoom 0, placed right or left of their
+station and skipped where they would collide. A bus slides along its own
+lane between the timepoints before and after it, by scheduled time, using
+the edge chain stored for that pair of timepoints.
+
+`build_schematic.py` makes `schematic.json` (56 KB, committed) from the
+GTFS feed with [LOOM](https://github.com/ad-freiburg/loom) (University of
+Freiburg: `gtfs2graph | topo | loom | octi`), cut to timepoints first. LOOM
+is C++ and builds on Linux or WSL; the script's docstring has the build
+line (build only the four tools — `topo`'s test suite takes most of an
+hour to compile). Rerun only when MATA changes its routes; line-ID
+renumberings don't matter, since routes are keyed by number and stops by
+code.
 
 ### 4. Analysis — `analysis.sql`
 
