@@ -635,8 +635,10 @@ async function renderBus() {
 
   const head = v.destination?.trim() || (ti != null ? sch.trips[ti][1].trim() : "");
   $("stop-name").innerHTML = `<span class="chip">${esc(route)}</span>${head ? "to " + esc(head) : ""}`;
+  // Fleet number (painted on the bus) and the tracker's own vehicle ID,
+  // which is what the history files and replay frames key on.
   const facts = [v.equipment_no && `${TROLLEY.has(route) ? "trolley" : "bus"} ${esc(v.equipment_no)}`,
-    esc(delayText(v)), v.occupancy_pct != null && `${v.occupancy_pct}% full`,
+    `ID ${esc(v.vehicle_id)}`, esc(delayText(v)), v.occupancy_pct != null && `${v.occupancy_pct}% full`,
     `<a href="strips.html#${encodeURIComponent(route)}">route strip</a>`].filter(Boolean);
   const row = (r, cls) => `<tr class="${cls}"><td>${esc(stopName[r.code] ?? r.code)}` +
     `<small class="muted">${r.due ? "sched " + hm(r.due) : "unscheduled"}</small></td>` +
