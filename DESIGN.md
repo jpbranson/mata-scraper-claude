@@ -198,7 +198,9 @@ Encodings, per bus:
   matching their direction.
 - **Size = passenger load** (`occupancy_pct`), radius 13–19 px (16–22 px
   for three-character route numbers, so the digits fit).
-- **Number = route**, a wedge on the rim = heading.
+- **Number = route**, a wedge on the rim = heading. **Shape = mode**: the
+  trolley (route 100) is a diamond, buses are circles. The vendor types
+  every vehicle "Bus", so the route is the only tell.
 - **Trail** = the last ten positions, 30 s apart (live, from `latest.json`;
   replaying, from the frames), in the tier color, one segment per pair: bright,
   thick and solid where the bus just was, darker, thinner and fainter as it
@@ -210,7 +212,14 @@ Around it: the whole network as hairlines and every stop as a small hollow
 dot with a high-contrast ring (light on the dark basemap, larger at higher
 zoom, hover for its name) — visible but subordinate to the buses. Click a
 bus and its route highlights, drawn over the other lines, while every other
-route and bus dims (click the bus again or the map to clear). Click a stop
+route and bus dims (click the bus again or the map to clear), a ring marks
+it, and a panel shows its fleet number, delay and load; the last three
+stops it served in the past 90 minutes (scheduled vs actual, from the
+arrivals log); its next three on its trip (scheduled vs expected =
+scheduled + current delay, from the timetable; located by its next stop,
+or replaying, by its last arrival); and a line chart of its delay over the
+last four hours from the replay frames (tier colors, 0/5/10/20 guides,
+"1h+" readings left as gaps, crosshair tooltip). Click a stop
 and the routes that stop there highlight, and a panel lists for each route
 the last three and next three scheduled trips: when each bus actually came
 (with minutes late/early in the tier colors), "not seen" when no arrival
@@ -219,7 +228,10 @@ was recorded, and, live, "~time" when a bus on that trip is on its way
 the viewed moment. Squares mark the four transit centers (hollow; click for
 the combined times of all their bays) and the bus garage at 1370 Levee Rd
 and trolley barn at 547 N Main St (filled) — hard-coded in `PLACES`, the
-transit centers located from where the timetable ends trips headed to them. Clock times are Memphis time wherever the viewer is. Hover for route,
+transit centers located from where the timetable ends trips headed to them.
+Clock times are Memphis time wherever the viewer is. On phones the panel
+takes the top of the screen and the map slides the clicked bus or stop
+into the clear area below it. Hover for route,
 headsign, delay text, load, fleet number. Top-right: buses in service, buses
 5+ min late, estimated riders (`CAPACITY = 40`). A dot goes red when the
 snapshot is older than 90 s. Bottom-left legend. Bottom bar: play/pause,
