@@ -190,7 +190,9 @@ const routeStyle = (f) => focus.has(f.properties.route_id)
 const STOP_ZOOM = 13;
 const stopStyle = () => ({ radius: map.getZoom() >= 15 ? 5.5 : 4, color: css("--stop"),
   weight: 2, fillColor: css("--surface"), fillOpacity: 1, opacity: 1 });
-fetch("network.geojson").then(r => r.json()).then(gj => {
+// no-cache: revalidate every load. The poller rebuilds this file when MATA
+// renumbers, and a stale cached copy lacks the stop codes the panel needs.
+fetch("network.geojson", { cache: "no-cache" }).then(r => r.json()).then(gj => {
   routes = L.geoJSON(gj, { filter: f => f.geometry.type !== "Point", style: routeStyle,
     interactive: false }).addTo(map);
   stops = L.geoJSON(gj, { filter: f => f.geometry.type === "Point",
@@ -431,6 +433,10 @@ $("stop-x").onclick = () => { closeStop(); setFocus([]); };
 async function renderStop() {
   if (!stopOpen) return;
   const p = stopOpen, token = ++stopRender, day = $("day").value, f = current();
+  if (!p.code) {
+    $("stop-body").innerHTML = `<p class="muted">This map's stop list is out of date. Reload the page.</p>`;
+    return;
+  }
   const now = f ? f.t : Date.now() / 1000;
   const idx = await cached(`data/schedule/${day}/stops.json`, Infinity);
   const here = idx?.stops[p.code] ?? [];
@@ -441,7 +447,7 @@ async function renderStop() {
     const [sch, arr] = await Promise.all([
       cached(`data/schedule/${day}/${route}.json`, Infinity),
       cached(`data/arrivals/${day}/${route}.jsonl`, ARRIVALS_TTL, true)]);
-    if (!sch) return "";
+    if (!sch) return `<div class="rt"><div><span class="chip">${route}</span><span class="muted">timetable file missing</span></div></div>`;
     const came = {}, rows = [];
     for (const a of arr ?? []) if (a.stop === p.code && a.t <= now) {
       if (a.trip) came[a.trip] = a; else rows.push({ at: a.t, past: true });

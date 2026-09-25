@@ -1,5 +1,6 @@
 """
-Rebuild replay frames and stop arrivals from the full position history.
+Rebuild replay frames, stop arrivals and stop schedules from the full
+position history.
 
 The poller writes data/replay/<day>.jsonl and data/arrivals/<day>/ as it
 goes, but only while it is running the current code. This regenerates
@@ -60,6 +61,7 @@ def main(only_day: str | None) -> None:
             return
         if timetable is None or timetable.day.isoformat() != day:
             timetable = Timetable(GTFS_PATH, date.fromisoformat(day))
+            timetable.write()       # the stop panel needs the day's schedule too
         arrived.setdefault(day, []).extend(detector.update(timetable, poll))
         if poll_t // FRAME_S == last_bin:
             return
