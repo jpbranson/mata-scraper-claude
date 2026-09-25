@@ -81,19 +81,92 @@ function offsetAt(pattern, pos) {
   return i + 1 < st.length ? st[i][4] + f * (st[i + 1][4] - st[i][4]) : st[i][4];
 }
 
-// Poll data/latest.json every POLL_MS; `onData(latest)` on each success.
-// Returns nothing; marks #clock stale (red dot) when the snapshot is > 90 s old.
-function followLive(onData) {
+// --- Live and replay ----------------------------------------------------------
+// The map's timeline, in #bar: play/pause, a scrubber across the viewed
+// day's frames, the clock, replay speed, LIVE, and a day picker. Live is
+// data/latest.json every POLL_MS; replaying, data/replay/<day>.jsonl (one
+// frame per FRAME_S, written by the poller; the files map.html replays).
+// `onShow(snap)` gets { t, day, vehicles } for whatever moment is showing,
+// vehicles shaped like latest.json's.
+const FRAME_S = 30, SPEEDS = [10, 60, 300];
+// Frames from before 2026-09-25 stop at unchanged_polls: no headsign or next
+// stop, so `locate` can only park those buses at a nearby stop.
+const fromFrame = (f, day) => ({ t: f.t, day, vehicles: f.v.map(a => ({
+  vehicle_id: a[0], route_id: a[1], lat: a[2], lon: a[3], bearing: a[4], delay_seconds: a[5],
+  delay_capped: a[6], occupancy_pct: a[7], unchanged_polls: a[8], destination: a[9],
+  next_stop_name: a[10], equipment_no: a[11] })) });
+
+function timeline(onShow) {
+  $("bar").innerHTML = `<button id="play" title="play / pause">&#9654;</button>
+    <input id="scrub" type="range" min="0" max="0" value="0" aria-label="time of day">
+    <div id="clock"><i></i><span>–</span></div>
+    <button id="speed" title="replay speed">60&times;</button>
+    <button id="live" title="back to live">LIVE</button>
+    <input id="day" type="date" aria-label="day">`;
+  // frames: the viewed day's snapshots, oldest first. cursor: index into
+  // frames while replaying, or null when live. serverDay: the poller's
+  // service day (from latest.json), which names today's replay file.
+  let frames = [], cursor = null, live = null, serverDay = null, playing = false, speed = 60, ticker = null;
+
+  function show() {
+    const s = cursor == null ? live : frames[cursor];
+    $("clock").querySelector("span").textContent = s ? hm(s.t) : "–";
+    $("clock").classList.toggle("live", cursor == null);
+    $("clock").classList.toggle("stale", cursor == null && !!s && Date.now() / 1000 - s.t > 90);
+    $("play").innerHTML = playing ? "&#10074;&#10074;" : "&#9654;";
+    $("play").classList.toggle("on", playing);
+    $("live").classList.toggle("on", cursor == null);
+    $("scrub").max = Math.max(frames.length - 1, 0);
+    $("scrub").value = cursor == null ? frames.length - 1 : cursor;
+    if (s) onShow(s);
+  }
+  // The file can be several MB by evening; live doesn't wait for it.
+  async function loadDay(day) {
+    const r = await fetch(`data/replay/${day}.jsonl`, { cache: "no-store" }).catch(() => null);
+    const loaded = r?.ok ? (await r.text()).split("\n").filter(Boolean).map(l => fromFrame(JSON.parse(l), day)) : [];
+    if ($("day").value !== day) return;          // another day was picked meanwhile
+    frames = loaded;
+  }
+  function setCursor(i) {
+    cursor = frames.length ? Math.max(0, Math.min(i, frames.length - 1)) : null;
+    show();
+  }
+  function goLive() {
+    playing = false; clearInterval(ticker); cursor = null;
+    if ($("day").value !== serverDay) { $("day").value = serverDay; loadDay(serverDay).then(show); }
+    show();
+  }
+  function play(on) {
+    playing = on; clearInterval(ticker);
+    if (!on) return show();
+    if (cursor == null) cursor = Math.max(frames.length - 1, 0);
+    ticker = setInterval(() => {
+      if (cursor >= frames.length - 1) return $("day").value === serverDay ? goLive() : play(false);
+      setCursor(cursor + 1);
+    }, FRAME_S * 1000 / speed);
+    show();
+  }
+  $("play").onclick = () => play(!playing);
+  $("scrub").oninput = (e) => setCursor(+e.target.value);
+  $("speed").onclick = () => { speed = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length];
+    $("speed").innerHTML = speed + "&times;"; if (playing) play(true); };
+  $("live").onclick = goLive;
+  $("day").onchange = async (e) => { playing = false; clearInterval(ticker);
+    await loadDay(e.target.value); cursor = frames.length ? 0 : null; show(); };
+
   const tick = async () => {
     const j = await getJSON("data/latest.json");
     if (!j) return;
-    j.day ??= new Date(j.fetched_at * 1000).toLocaleDateString("en-CA", { timeZone: TZ });
-    const c = $("clock");
-    if (c) {
-      c.querySelector("span").textContent = hm(j.fetched_at);
-      c.classList.toggle("stale", Date.now() / 1000 - j.fetched_at > 90);
+    const day = j.day ?? new Date(j.fetched_at * 1000).toLocaleDateString("en-CA", { timeZone: TZ });
+    live = { t: j.fetched_at, day, vehicles: j.vehicles };
+    // First load, or the service day rolled over while watching live.
+    if (day !== serverDay && (serverDay == null || cursor == null)) {
+      serverDay = day; $("day").value = day; frames = [];
+      loadDay(day).then(() => { if (cursor == null) show(); });
     }
-    await onData(j);
+    // Extend today's timeline at the file's cadence so the scrubber reaches now.
+    if ($("day").value === serverDay && (!frames.length || live.t - frames.at(-1).t >= FRAME_S - 5)) frames.push(live);
+    if (cursor == null) show(); else $("scrub").max = Math.max(frames.length - 1, 0);
   };
   tick();
   setInterval(tick, POLL_MS);

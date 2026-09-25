@@ -296,9 +296,11 @@ const SPEEDS = [10, 60, 300];
 let serverDay = null;
 const today = () => serverDay;
 
+// Frames from before 2026-09-25 stop at unchanged_polls.
 const fromLine = (line) => { const f = JSON.parse(line); return { t: f.t, v: f.v.map(a => ({
   vehicle_id: a[0], route_id: a[1], lat: a[2], lon: a[3], bearing: a[4], delay_seconds: a[5],
-  delay_capped: a[6], occupancy_pct: a[7], unchanged_polls: a[8] })) }; };
+  delay_capped: a[6], occupancy_pct: a[7], unchanged_polls: a[8], destination: a[9],
+  next_stop_name: a[10], equipment_no: a[11] })) }; };
 
 async function loadDay(day) {
   const r = await fetch(`data/replay/${day}.jsonl`, { cache: "no-store" });
@@ -658,21 +660,31 @@ async function renderBus() {
 // Minutes late over the last CHART_H hours, from the replay frames: one 2 px
 // line in the delay-tier colors (above 0 = late, below = early), guides at
 // 0 and the tier thresholds, and a crosshair that snaps to the nearest
-// reading. "1h+" readings are floors, not values: left as gaps.
+// reading. "1h+" readings are floors, not values: left as gaps. Some buses
+// run two routes in turn (MATA's timetable gives them one block, e.g. 13
+// and 40): each switch gets a vertical line and each route's stretch its
+// number along the top, and the line breaks there, since the delay is
+// measured against a different trip on either side.
 function delayChart(el, id, now) {
   const from = now - CHART_H * 3600, pts = [];
+  const reading = (v) => ({ r: v.route_id, d: v.delay_capped || v.delay_seconds == null ? null : v.delay_seconds / 60 });
   for (const fr of frames) {
     if (fr.t < from || fr.t > now) continue;
     const v = fr.v.find(x => x.vehicle_id === id);
-    if (v) pts.push({ t: fr.t, d: v.delay_capped || v.delay_seconds == null ? null : v.delay_seconds / 60 });
+    if (v) pts.push({ t: fr.t, ...reading(v) });
   }
   const cur = current()?.v.find(x => x.vehicle_id === id);
-  if (cur && (!pts.length || pts.at(-1).t < now))
-    pts.push({ t: now, d: cur.delay_capped || cur.delay_seconds == null ? null : cur.delay_seconds / 60 });
+  if (cur && (!pts.length || pts.at(-1).t < now)) pts.push({ t: now, ...reading(cur) });
   const vals = pts.filter(p => p.d != null).map(p => p.d);
   if (!vals.length) { el.innerHTML = `<p class="muted">No delay readings yet.</p>`; return; }
+  // Stretches on one route, oldest first.
+  const runs = [];
+  for (const p of pts) if (p.r !== runs.at(-1)?.r) runs.push({ r: p.r, t: p.t });
+  const switched = runs.length > 1;
+  // Rows logged before routes.csv caught up carry `cadavl:<line id>`.
+  const named = (r) => r.startsWith("cadavl:") ? "line " + r.slice(7) : "route " + r;
 
-  const W = Math.max(el.clientWidth, 240), H = 150, L0 = 38, B = 24, T = 10;
+  const W = Math.max(el.clientWidth, 240), H = switched ? 170 : 150, L0 = 38, B = 24, T = switched ? 30 : 10;
   const lo = Math.min(-5, Math.floor(Math.min(...vals))), hi = Math.max(10, Math.ceil(Math.max(...vals)));
   const x = (t) => L0 + (t - from) / (now - from) * (W - L0 - 4);
   const y = (d) => T + (hi - d) / (hi - lo) * (H - T - B);
@@ -684,19 +696,34 @@ function delayChart(el, id, now) {
       guides += `<line x1="${L0}" x2="${W - 4}" y1="${gy}" y2="${gy}" stroke="var(--${g === 0 ? "muted" : "hairline"})" stroke-width="1" ${g ? 'stroke-dasharray="3 4"' : ""}/>`;
     if (label) { guides += `<text x="${L0 - 6}" y="${gy + 5}" text-anchor="end">${g > 0 ? "+" + g : g}</text>`; lastY = gy; }
   }
-  // The line, split where the tier changes or readings stop (gap > 3 min).
+  // Route switches: a line up through the label strip, and each stretch's
+  // route number where it fits (~9 px a character at 16 px). Newest first:
+  // the current route always gets its label, flush right if its stretch is
+  // too short, and older labels give way to it.
+  let marks = "", room = W - 4;
+  const text = (tx, s, end) => `<text x="${tx}" y="19"${end ? ' text-anchor="end"' : ""} style="fill:var(--ink-2);font-weight:600;paint-order:stroke;stroke:var(--surface);stroke-width:5px">${esc(s)}</text>`;
+  if (switched) for (let i = runs.length - 1; i >= 0; i--) {
+    const x0 = Math.max(x(runs[i].t), L0), x1 = Math.min(i + 1 < runs.length ? x(runs[i + 1].t) : W - 4, room);
+    if (i) marks += `<line x1="${x0}" x2="${x0}" y1="4" y2="${H - B}" stroke="var(--muted)" stroke-width="1.5"/>`;
+    const names = [named(runs[i].r), runs[i].r.replace(/^cadavl:/, "")], w = (s) => s.length * 9 + 10;
+    const label = names.find(s => w(s) <= x1 - x0);
+    if (label) { marks += text(x0 + 5, label, false); room = x0 - 4; }
+    else if (i === runs.length - 1) { marks += text(W - 4, names[0], true); room = W - 4 - w(names[0]); }
+  }
+  // The line, split where the tier or route changes or readings stop (gap > 3 min).
   let lines = "", seg = [], segTier = null;
   const flush = () => { if (seg.length > 1) lines += `<polyline points="${seg.join(" ")}" fill="none" stroke="var(--${segTier})" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`; };
   pts.forEach((p, i) => {
     const prev = pts[i - 1];
-    if (p.d == null || (prev && p.t - prev.t > 180)) { flush(); seg = []; segTier = null; if (p.d == null) return; }
+    if (p.d == null || (prev && (p.t - prev.t > 180 || p.r !== prev.r))) { flush(); seg = []; segTier = null; if (p.d == null) return; }
     const t = tier({ delay_seconds: p.d * 60 }), pt = `${x(p.t).toFixed(1)},${y(p.d).toFixed(1)}`;
     if (t !== segTier) { flush(); seg = seg.length ? [seg.at(-1)] : []; segTier = t; }
     seg.push(pt);
   });
   flush();
-  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="Delay over the last ${CHART_H} hours, now ${esc(cur ? delayText(cur) : "")}">
-    ${guides}${lines}
+  const via = switched ? `, on ${runs.map(u => named(u.r)).join(" then ")}` : "";
+  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="Delay over the last ${CHART_H} hours${esc(via)}, now ${esc(cur ? delayText(cur) : "")}">
+    ${guides}${marks}${lines}
     <text x="${L0}" y="${H - 4}">${hm(from)}</text><text x="${W - 4}" y="${H - 4}" text-anchor="end">${hm(now)}</text>
     <line class="xh" y1="${T}" y2="${H - B}" stroke="var(--ink-2)" stroke-width="1" visibility="hidden"/>
     <circle class="dot" r="4" fill="var(--ink)" stroke="var(--surface)" stroke-width="2" visibility="hidden"/>
@@ -712,7 +739,7 @@ function delayChart(el, id, now) {
     tipEl.hidden = false;
     tipEl.innerHTML = "<b></b> <span class=\"muted\"></span>";
     tipEl.firstChild.textContent = m === 0 ? "on time" : `${Math.abs(m)} min ${m < 0 ? "early" : "late"}`;
-    tipEl.lastChild.textContent = hm(p.t);
+    tipEl.lastChild.textContent = hm(p.t) + (switched ? " · " + named(p.r) : "");
     tipEl.style.left = Math.min(Math.max(px - tipEl.offsetWidth / 2, 0), W - tipEl.offsetWidth) + "px";
     tipEl.style.top = "-34px";
   };

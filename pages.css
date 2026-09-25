@@ -19,14 +19,35 @@ a { color: var(--focus); }
   box-shadow: 0 0 0 1px var(--ring), 0 2px 10px rgba(0,0,0,.15); }
 .muted, small { color: var(--muted); font-size: 16px; }
 
-/* Top bar: page links, route chips, clock. */
+/* Top bar: page links, route chips. */
 #top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 10px 16px; }
 #top nav { display: flex; gap: 14px; font-weight: 600; }
 #top nav a { text-decoration: none; color: var(--ink-2); }
 #top nav a.on { color: var(--ink); border-bottom: 2px solid var(--focus); }
-#clock { margin-left: auto; display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
-#clock i { width: 9px; height: 9px; border-radius: 50%; background: #0ca30c; }
+
+/* Timeline, as on the map: play/pause, scrubber, clock, speed, LIVE, day
+   (transit.js fills it). Fixed to the bottom; pages leave room for it. */
+#bar { position: fixed; bottom: 14px; left: 14px; right: 14px; z-index: 1002; display: flex;
+  align-items: center; gap: 14px; padding: 10px 16px; }
+#bar button { font: 600 16px Inter, system-ui, sans-serif; color: var(--ink); background: none;
+  border: 1.5px solid var(--hairline); border-radius: 8px; padding: 6px 12px; cursor: pointer; min-width: 44px; }
+#bar button.on { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+#live.on { background: var(--late20); border-color: var(--late20); color: #fff; }
+#bar input[type=range] { flex: 1; accent-color: var(--focus); min-width: 80px; }
+#bar input[type=date] { font: 16px Inter, system-ui, sans-serif; color: var(--ink); background: none;
+  border: 1.5px solid var(--hairline); border-radius: 8px; padding: 5px 8px; }
+#clock { min-width: 5.5em; display: flex; align-items: center; justify-content: center; gap: 6px;
+  font-variant-numeric: tabular-nums; }
+#clock i { width: 9px; height: 9px; border-radius: 50%; background: #0ca30c; display: none; }
+#clock.live i { display: block; }
 #clock.stale i { background: var(--late20); }
+:root { --bar-room: 78px; }       /* the bar's height plus its gap */
+/* Phones: scrubber on its own row. */
+@media (max-width: 720px) {
+  #bar { flex-wrap: wrap; gap: 10px; }
+  #bar input[type=range] { flex: 1 1 100%; order: -1; }
+  :root { --bar-room: 158px; }
+}
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { font: 600 16px Inter, system-ui, sans-serif; color: var(--ink); background: none; cursor: pointer;
   border: 1.5px solid var(--hairline); border-radius: 8px; padding: 3px 9px; min-width: 44px; }

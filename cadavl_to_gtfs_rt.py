@@ -278,16 +278,19 @@ def replay_path(t: int) -> Path:
 
 
 def replay_frame(rows: list[dict], t: int) -> str:
-    """Compact frame for map.html's replay, one line: the poll time and, per
-    bus, the fields the map needs. ~59 bytes per bus."""
+    """Compact frame for the pages' replay, one line: the poll time and, per
+    bus, the fields they need. The last three (headsign, next stop, fleet
+    number) let the strips and schematic place a bus on its stop pattern;
+    frames from before 2026-09-25 lack them. ~110 bytes per bus."""
     return json.dumps({"t": t, "v": [
         [r["vehicle_id"], r["route_id"], round(r["lat"], 5), round(r["lon"], 5),
          r["bearing"], r["delay_seconds"], r["delay_capped"], r["occupancy_pct"],
-         r["unchanged_polls"]] for r in rows]}, separators=(",", ":")) + "\n"
+         r["unchanged_polls"], r.get("destination"), r.get("next_stop_name"), r.get("equipment_no")]
+        for r in rows]}, separators=(",", ":")) + "\n"
 
 
 def write_replay_frame(rows: list[dict], fetched_at: int) -> None:
-    """One frame per REPLAY_EVERY polls (~5-7 MB/day). The page builds trails
+    """One frame per REPLAY_EVERY polls (~7 MB/day). The page builds trails
     from these too, so they show the moment it opens. backfill_replay.py
     rebuilds a day's file from the full history if this ever has gaps."""
     path = replay_path(fetched_at)

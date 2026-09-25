@@ -14,7 +14,7 @@
   html, body { height: 100%; }
   body { display: flex; flex-direction: column; }
   #top { margin: 14px 14px 0; position: relative; z-index: 1001; }
-  #map { flex: 1; margin-top: 10px; background: var(--surface); }
+  #map { flex: 1; margin: 10px 0 var(--bar-room); background: var(--surface); }
   .leaflet-container { background: var(--surface); font: 16px Inter, system-ui, sans-serif; }
   .leaflet-tooltip { background: var(--surface); color: var(--ink); border: none; border-radius: 8px;
     box-shadow: 0 0 0 1px var(--ring), 0 2px 10px rgba(0,0,0,.15); padding: 6px 10px;
@@ -28,7 +28,7 @@
   .bus text { font: 600 16px Inter, system-ui, sans-serif; text-anchor: middle; }
   .term span { display: inline-block; white-space: nowrap; font-weight: 600; font-size: 16px;
     color: var(--ink); background: var(--surface); border: 1.5px solid var(--hairline); border-radius: 6px; padding: 0 5px; }
-  #legend { position: absolute; left: 14px; bottom: 14px; z-index: 1000; padding: 10px 14px; color: var(--ink-2); }
+  #legend { position: absolute; left: 14px; bottom: calc(var(--bar-room) + 14px); z-index: 1000; padding: 10px 14px; color: var(--ink-2); }
   #legend div { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
   #legend i { width: 13px; height: 13px; border-radius: 50%; flex: none; }
   @media (max-width: 720px) { #legend { display: none; } }
@@ -37,7 +37,6 @@
 <body>
 <header id="top" class="panel">
   <nav><a href="map.html">Map</a><a href="strips.html">Strips</a><a href="schematic.html" class="on">Schematic</a></nav>
-  <div id="clock"><i></i><span>–</span></div>
   <div class="chips" id="routes" style="flex-basis: 100%"></div>
 </header>
 <div id="map"></div>
@@ -48,8 +47,10 @@
   <div><i style="background:var(--late10)"></i>10+ min late</div>
   <div><i style="background:var(--late20)"></i>20+ min late</div>
   <div><i style="background:var(--surface);border:2.5px solid var(--ink);width:9px;height:9px"></i>major stop</div>
+  <div><i style="width:24px;height:10px;border-radius:5px;background:var(--ink);opacity:.35"></i>band width = % full</div>
   <div>click a line or route to pick it out</div>
 </div>
+<div id="bar" class="panel"></div>
 <script src="transit.js"></script>
 <script>
 // The whole network as a subway-style map, from schematic.json (built by
@@ -58,7 +59,10 @@
 // lanes in the order LOOM chose to minimise crossings. Lines are neutral so
 // color stays with the buses' delay. Buses slide along their own lane
 // between the major stops before and after them, by scheduled time. Lanes
-// keep a fixed pixel spacing, so the geometry is recomputed on zoom.
+// keep a fixed pixel spacing, so the geometry is recomputed on zoom. How
+// full a bus is shows as a translucent band along that stretch of its lane,
+// wider the fuller it is, drawn under the lines so bundles stay readable.
+// The bar at the bottom replays any recorded moment, as on the map.
 // Lane spacing and line width in pixels; halved when zoomed far out (a
 // phone's whole-network view), where full-size bundles swamp the map.
 const small = () => map.getZoom() < -2.5;
@@ -69,9 +73,13 @@ const map = L.map("map", { crs: L.CRS.Simple, preferCanvas: true, zoomControl: f
 map.attributionControl.setPrefix("").addAttribution("Layout: LOOM, University of Freiburg");
 L.control.zoom({ position: "bottomright" }).addTo(map);
 map.createPane("buses").style.zIndex = 650;
+map.createPane("loads").style.zIndex = 350;       // under the lines (overlay pane, 400)
+map.getPane("loads").style.pointerEvents = "none";
+// Load band: the lane's width plus up to LOAD_PX more at 100% full.
+const LOAD_PX = () => small() ? 12 : 32;
 
 let S = null, focus = null, latest = null, routes = [];
-const lineLayers = [], labels = [], busMarkers = {};
+const lineLayers = [], labels = [], busMarkers = {}, loadBands = [];
 let lanes = [];                                    // lanes[edge][route] = offset polyline (units)
 let width = [];                                    // widest bundle (lanes) through each node
 const radius = (i) => small() ? Math.min(width[i] * lanePx() / 2 + 1.5, 6) : Math.min(width[i] * lanePx() / 2 + 3, 13);
@@ -233,15 +241,17 @@ function drawChips() {
 }
 
 // --- Buses ------------------------------------------------------------------
-followLive(async (j) => {
-  latest = j;
+timeline(async (snap) => {
+  latest = snap;
   // Only the routes with buses out; each file once per day.
-  await Promise.all([...new Set(j.vehicles.map(v => v.route_id))].map(r => routeFile(j.day, r)));
+  await Promise.all([...new Set(snap.vehicles.map(v => v.route_id))].map(r => routeFile(snap.day, r)));
+  if (latest !== snap) return;          // a newer moment arrived meanwhile
   drawChips(); drawBuses();
 });
 
 // A bus's place on the schematic: between the major stops before and after
-// it on its pattern, along its route's lane, by scheduled time.
+// it on its pattern, along its route's lane, by scheduled time. { ll, leg }:
+// leg is that stretch of lane (map coordinates), or null at a station.
 async function place(v) {
   const file = await routeFile(latest.day, v.route_id), pats = file?.patterns;
   const at = pats?.length && locate(v, pats);
@@ -252,17 +262,17 @@ async function place(v) {
   while (a > 0 && !major(a)) a--;
   while (b < last && !major(b)) b++;
   const station = (k) => S.stations[st[k][0]];
-  if (b > last) return station(a) != null ? pt(S.nodes[station(a)]) : null;
+  const atStation = () => station(a) != null ? { ll: pt(S.nodes[station(a)]), leg: null } : null;
+  if (b > last) return atStation();
   const leg = S.legs[v.route_id]?.[`${st[a][0]}>${st[b][0]}`];
-  if (!leg) return station(a) != null ? pt(S.nodes[station(a)]) : null;
-  if (!leg.length) return pt(S.nodes[station(a)]);
+  if (!leg?.length) return atStation();
   const pts = [];
   for (const [ei, dir] of leg) {
     const lane = lanes[ei][v.route_id];
     pts.push(...(dir > 0 ? lane : [...lane].reverse()));
   }
   const f = (offsetAt(p, at.pos) - st[a][4]) / ((st[b][4] - st[a][4]) || 1);
-  return pt(along(pts, f));
+  return { ll: pt(along(pts, f)), leg: pts.map(pt) };
 }
 
 function icon(v) {
@@ -281,11 +291,20 @@ async function drawBuses() {
   const token = ++drawing, seen = new Set();
   const spots = await Promise.all(latest.vehicles.map(place));
   if (token !== drawing) return;
+  for (const l of loadBands) map.removeLayer(l);
+  loadBands.length = 0;
   latest.vehicles.forEach((v, i) => {
-    const ll = spots[i];
-    if (!ll) return;
+    if (!spots[i]) return;
+    const { ll, leg } = spots[i], load = v.occupancy_pct;
     seen.add(v.vehicle_id);
-    const tipText = `<b>${esc(v.route_id)}</b> ${esc((v.destination ?? "").trim())}<br>${esc(delayText(v))}` +
+    // Its stretch of lane, as wide as it is full; not for a bus whose GPS
+    // has stuck (its load is as stale as its position) or another route
+    // than the one picked out.
+    if (leg && load > 0 && v.unchanged_polls < GHOST_POLLS && (!focus || focus === v.route_id))
+      loadBands.push(L.polyline(leg, { pane: "loads", interactive: false, color: css("--ink"), opacity: .35,
+        weight: weightPx() + Math.min(load, 100) / 100 * LOAD_PX(), lineCap: "round", lineJoin: "round" }).addTo(map));
+    const full = load == null ? "" : ` &middot; ${load}% full`;
+    const tipText = `<b>${esc(v.route_id)}</b> ${esc((v.destination ?? "").trim())}<br>${esc(delayText(v))}${full}` +
       (v.equipment_no ? `<br><small>${TROLLEY.has(v.route_id) ? "trolley" : "bus"} ${esc(v.equipment_no)}</small>` : "");
     const m = busMarkers[v.vehicle_id] ??= L.marker(ll, { pane: "buses" })
       .bindTooltip("", { direction: "top", offset: [0, -16] })

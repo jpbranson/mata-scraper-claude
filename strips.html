@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="pages.css">
 <style>
   #top { margin: 14px; }
-  main { padding: 0 16px 40px; }
+  main { padding: 0 16px calc(var(--bar-room) + 24px); }
   h1 { font-size: 24px; font-weight: 600; margin: 8px 0 4px; }
   h1 .chip { cursor: default; margin-right: 8px; }
   #strips { display: flex; flex-wrap: wrap; gap: 28px 40px; margin-top: 16px; }
@@ -26,7 +26,6 @@
 <body>
 <header id="top" class="panel">
   <nav><a href="map.html">Map</a><a href="strips.html" class="on">Strips</a><a href="schematic.html">Schematic</a></nav>
-  <div id="clock"><i></i><span>–</span></div>
   <div class="chips" id="routes" style="flex-basis: 100%"></div>
 </header>
 <main>
@@ -43,6 +42,7 @@
   <div id="strips"></div>
   <p id="off" class="muted"></p>
 </main>
+<div id="bar" class="panel"></div>
 <script src="transit.js"></script>
 <script>
 // One strip per direction (headsign) of the chosen route, stops top to
@@ -50,6 +50,7 @@
 // Each bus is placed between its previous and next stop by distance; its
 // label gives the gap to the bus ahead (down the strip) in scheduled minutes, so
 // bunching and gaps read at a glance. Route in the URL hash (strips.html#36).
+// The bar at the bottom replays any recorded moment, as on the map.
 const ROW = 26, TOP = 14;
 let routes = [], latest = null, render_ = 0;
 const chosen = () => location.hash.slice(1) || routes[0]?.id;
@@ -61,7 +62,7 @@ fetch("routes.csv", { cache: "no-cache" }).then(r => r.text()).then(t => {
 });
 addEventListener("hashchange", draw);
 addEventListener("resize", draw);
-followLive((j) => { latest = j; draw(); });
+timeline((snap) => { latest = snap; draw(); });
 
 function draw() {
   if (!routes.length) return;
@@ -83,8 +84,8 @@ async function renderStrips(route) {
   if (token !== render_) return;
   const pats = file?.patterns;
   if (!pats?.length) {
-    $("strips").innerHTML = `<p class="muted">${file ? "No stop patterns in today's timetable file. Restart the poller (ops\\update.ps1) to write them."
-      : "No timetable for this route today."}</p>`;
+    $("strips").innerHTML = `<p class="muted">${file ? "No stop patterns in this day's timetable file. Restart the poller (ops\\update.ps1) to write them."
+      : "No timetable for this route on this day."}</p>`;
     $("off").textContent = "";
     return;
   }
