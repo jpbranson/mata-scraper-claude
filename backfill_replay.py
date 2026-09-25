@@ -13,7 +13,8 @@ buses came.
 
 On the way it repairs two things older pollers got wrong: rows on lines
 routes.csv didn't know yet (`cadavl:<id>`, mapped with today's routes.csv
-where the ID is in it) and "1h+" delays, which were stored as 0.
+where the ID is in it; backfill_routes.py fixes the history itself) and
+"1h+" delays, which were stored as 0.
 
 Files for the days touched are rewritten from scratch. Stop the poller
 first if you rebuild today, or its next writes will land in the rebuilt
@@ -29,8 +30,9 @@ from datetime import date, datetime
 
 import requests
 
-from cadavl_to_gtfs_rt import (OUT_DIR, POLL_SECONDS, REPLAY_EVERY, ROUTES, parse_delay,
-                               replay_frame, replay_path)
+from backfill_routes import fix_route
+from cadavl_to_gtfs_rt import (OUT_DIR, POLL_SECONDS, REPLAY_EVERY, parse_delay, replay_frame,
+                               replay_path)
 from schedule import GTFS_PATH, Arrivals, Timetable, append_arrivals, fetch_gtfs
 
 FRAME_S = POLL_SECONDS * REPLAY_EVERY
@@ -83,8 +85,7 @@ def main(only_day: str | None) -> None:
                     flush()
                     poll, poll_t = [], r["observed_at"]
                 r.setdefault("unchanged_polls", 0)
-                if r["route_id"].startswith("cadavl:") and r.get("line_internal_id") in ROUTES:
-                    r["route_id"] = ROUTES[r["line_internal_id"]]["route_id"]
+                fix_route(r)
                 if r.get("delay_raw"):
                     r["delay_seconds"], r["delay_capped"] = parse_delay(r["delay_raw"])
                 poll.append(r)

@@ -1,5 +1,6 @@
-# Rebuild replay frames and stop arrivals from the recorded history, with the
-# poller paused so it can't write into the files being rebuilt. Run from
+# Put route numbers on history rows recorded while routes.csv was stale, then
+# rebuild replay frames and stop arrivals from the history, with the poller
+# paused so it can't write into the files being rebuilt. Run from
 # PowerShell in the repo folder (no admin needed):
 #
 #   .\ops\backfill.ps1              # every recorded day
@@ -16,6 +17,9 @@ Start-Sleep 1
 
 try {
     $dayArg = @(if ($Day) { $Day })
+    # Every history file: they're named by UTC date, $Day is a local one.
+    & "$dir\.venv\Scripts\python.exe" "$dir\backfill_routes.py"
+    if ($LASTEXITCODE -ne 0) { Write-Warning "route backfill failed; see output above." }
     & "$dir\.venv\Scripts\python.exe" "$dir\backfill_replay.py" @dayArg
     if ($LASTEXITCODE -ne 0) { Write-Warning "backfill failed; see output above." }
 } finally {
