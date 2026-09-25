@@ -292,7 +292,10 @@ named (timepoints bold with a big dot), like the line diagram over a
 subway door. Buses sit on the line with a chevron for direction; beside
 each, its delay, fleet number and the gap to the bus ahead in scheduled
 minutes — bunching and holes read at a glance. Labels shift down rather
-than overlap. Branches with the same headsign say "via" their first stop
+than overlap. Load is the schematic's band: the line between the timepoints
+before and after a bus, widened by up to 24 px at 100% full (so it stays
+short of the stop names), drawn under the line and stops; hover a bus for
+the exact %. Branches with the same headsign say "via" their first stop
 the others lack.
 
 **Schematic** (`schematic.html#36`): the whole network as a subway map,
