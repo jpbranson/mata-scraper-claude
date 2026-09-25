@@ -353,9 +353,9 @@ After pulling new code, `.\ops\update.ps1` pulls, re-runs
 `pip install -r requirements.txt`, and restarts both tasks. It needs no
 admin: setup grants the installing account read + execute on both tasks,
 which is enough to start and stop them. For
-days recorded before replay or arrivals existed, run
-`python backfill_replay.py` once (stop the poller first if it includes
-today).
+days recorded before replay or arrivals existed, run `.\ops\backfill.ps1`
+(every day) or `.\ops\backfill.ps1 2026-09-24` (one day). It pauses the
+poller, runs `backfill_replay.py`, and starts the poller again.
 
 The machine's clock is already Central time, so the service-hours check
 needs no time-zone setting. Do set Power settings to never sleep (and, on
