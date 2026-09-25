@@ -216,7 +216,10 @@ the last three and next three scheduled trips: when each bus actually came
 (with minutes late/early in the tier colors), "not seen" when no arrival
 was recorded, and, live, "~time" when a bus on that trip is on its way
 (scheduled + its current delay). Replaying, the panel shows the same as of
-the viewed moment. Clock times are Memphis time wherever the viewer is. Hover for route,
+the viewed moment. Squares mark the four transit centers (hollow; click for
+the combined times of all their bays) and the bus garage at 1370 Levee Rd
+and trolley barn at 547 N Main St (filled) — hard-coded in `PLACES`, the
+transit centers located from where the timetable ends trips headed to them. Clock times are Memphis time wherever the viewer is. Hover for route,
 headsign, delay text, load, fleet number. Top-right: buses in service, buses
 5+ min late, estimated riders (`CAPACITY = 40`). A dot goes red when the
 snapshot is older than 90 s. Bottom-left legend. Bottom bar: play/pause,
