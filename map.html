@@ -160,7 +160,9 @@
 // build_crosswalk.py), and on clicking a stop that day's data/schedule/ and
 // data/arrivals/ files (schedule.py). Serve the repo root over HTTP —
 // fetch() won't work over file://.
-const POLL_MS = 10000, FRAME_S = 30, TRAIL_S = 300, GHOST_POLLS = 30, CAPACITY = 40;
+// CAPACITY: the vendor's load % is riders out of 50 on every vehicle (it only
+// ever moves in steps of 2), so this turns it back into a count.
+const POLL_MS = 10000, FRAME_S = 30, TRAIL_S = 300, GHOST_POLLS = 30, CAPACITY = 50;
 // Clock times read in Memphis time wherever the viewer is, like the timetable.
 const TZ = "America/Chicago";
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
