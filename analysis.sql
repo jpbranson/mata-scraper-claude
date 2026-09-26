@@ -376,7 +376,7 @@ WITH a AS (
     SELECT *, lag(t) OVER w AS prev_t, lag(t_sched) OVER w AS prev_sched,
            lag(vehicle) OVER w AS prev_vehicle
     FROM arrivals_due
-    WINDOW w AS (PARTITION BY day, route, stop ORDER BY t)),
+    WINDOW w AS (PARTITION BY day, route, stop ORDER BY t, t_sched)),
 pairs AS (
     SELECT route, t - prev_t AS actual, t_sched - prev_sched AS planned
     FROM a
