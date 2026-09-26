@@ -26,8 +26,8 @@ live in the docstrings of the scripts.
 | `/topo/vehicules` | Every bus: position, heading, speed, next stop, schedule adherence ("4 min late"), passenger load ("30%") | ~12 KB, refreshes every 10 s | The poller — the only thing hit continuously |
 | `/topo` | Full network: 25 lines, ~3,700 stops | ~28 MB, changes rarely | `routes.csv` / `stops.csv` crosswalk |
 | `/config/version` | Integer that bumps when `/topo` changes | tiny | Know when to rebuild the crosswalk |
-| `/topo/refresh` | Current detours (bypassed and replacement segments) | ~385 KB, changes over days | Optional detour overlay |
-| `/iv/message` | Rider-facing alert text | small | Optional detour overlay |
+| `/topo/refresh` | Current detours (bypassed and replacement segments) | ~150–385 KB, changes over days | Detour log, hourly (`cadavl_detours.py`) |
+| `/iv/message` | Rider-facing notices: detours, and trips out of service | small | Detour log, hourly |
 | `/horaires/pta/<stop id>` | The tracker's own stop popup: next one or two times per route | small | Nothing (no CORS, so the page can't call it; kept as a cross-check) |
 | `gtfs.mata.cadavl.com/MATA/GTFS/GTFS_MATA.zip` | MATA's published timetable (GTFS), same vendor | ~1.5 MB, rebuilt nightly | Stop schedules and trip matching (`schedule.py`) |
 | `gtfsrt.mata.cadavl.com/ProfilGtfsRt2_0RSProducer-MATA/{VehiclePosition,TripUpdate,Alert}.pb` | MATA's official GTFS-Realtime, same vendor | ~3 KB / ~120 KB / ~1 KB, rebuilt every 30 s | Archived beside our history (`official_feed.py`) |
@@ -62,9 +62,11 @@ Known limits of the tracker's vehicle payload, which shape the design
 (the official feed fills the first two, in its own archive, not in our
 rows):
 
-- **No server timestamp.** `observed_at` is *our* fetch time. A bus whose
-  coordinates don't change across many polls is a dropped GPS feed (a "ghost"),
-  not a parked bus; `unchanged_polls` counts that.
+- **No server timestamp.** `observed_at` is *our* fetch time, so a bus whose
+  coordinates stop changing is either parked (a layover or hold) or has a
+  tracker that stopped reporting (a "ghost"). `unchanged_polls` counts the
+  still polls; how the streak ends tells the two apart (see Open questions,
+  ghost threshold).
 - **No trip or block ID.** We know the route and headsign, not which scheduled
   trip a bus is on; `schedule.py` infers it (see below), and the official
   feed's `trip_id` is there to check it against. Delay is whatever
@@ -82,17 +84,23 @@ rows):
   (see Official feed below).
 - **Delay is capped.** `"1h+ late"` / `"1h+ early"` mean "at least an hour",
   stored as ±3600 and flagged `delay_capped`. Those rows are usually
-  misassigned buses; exclude them. (Pollers before 2026-09-24 stored them as
-  0; `backfill_replay.py` re-parses `delay_raw`.)
+  misassigned buses; exclude them. (Pollers until the evening of 2026-09-24
+  stored them as 0, still flagged, so `NOT delay_capped` drops them either
+  way; `backfill_replay.py` re-parses `delay_raw`.)
+- **Delay is in whole minutes, and "on time" spans a minute either way.**
+  The vendor never says "1 min": after `"on time"` the next values are
+  `"2 min late"` and `"2 min early"`.
 - **Line and stop IDs are opaque and unstable.** Internal `idLigne` (e.g.
   111302) maps to route "36" only by lookup, and every ID changes when the
   vendor publishes a new topo version — which happened twice in September
   2026, days apart. Stop codes (`LAMLAPEN`) and route numbers are stable;
   key everything on those.
-- **Speed unit unknown.** `vitesse` ranges 0–20; `probe_cadence.py` can settle
-  whether it's mph or km/h. Not needed for any of the three questions.
-- **Load is a percentage** of an unknown capacity, presumably from the bus's
-  automatic passenger counters. Treat rider counts as estimates.
+- **Speed is metres per second**, whole numbers (typically 0–21; about 1
+  reading in 1,200 is impossible, up to 347). Settled 2026-09-25; see Open
+  questions. Not needed for any of the three questions.
+- **Load is riders out of 50**, presumably from the bus's automatic
+  passenger counters: `"30%"` is 15 people, on every vehicle, trolley
+  included (see Open questions). Good as the counters are, no better.
 
 ## Architecture
 
@@ -105,23 +113,25 @@ rows):
                                       ├─▶ data/replay/YYYY-MM-DD.jsonl                       one frame per 30 s, for replay
                                       ├─▶ data/schedule/YYYY-MM-DD/, data/arrivals/YYYY-MM-DD/  timetable + when buses came (schedule.py)
                                       ├─▶ data/official/dt=YYYY-MM-DD/                      official GTFS-RT archive (official_feed.py)
+                                      ├─▶ data/detours/dt=YYYY-MM-DD/detours.jsonl.gz        detours + rider messages, when changed (cadavl_detours.py)
                                       └─▶ data/vehicle_positions.pb                         GTFS-RT feed
  GTFS_MATA.zip ── once a day ──▶ poller (schedule.py)
  official GTFS-RT ── every 30 s (trip updates every 5 min) ──▶ poller (official_feed.py)
+ /topo/refresh, /iv/message ── hourly ──▶ poller (cadavl_detours.py)
  /topo ── when line IDs change ──▶ poller (build_crosswalk.py) ──▶ routes.csv, stops.csv, network.geojson
 
  map.html  ── data/latest.json every 10 s + the day's replay file + stop files on click ──▶  live map, replay, stop times  (served by python -m http.server)
  strips.html, schematic.html ── data/latest.json every 10 s + route files ──▶  route strips, subway-style map
  schematic.json ── built by build_schematic.py with LOOM (occasionally, on Linux/WSL) ──▶  the schematic layout
- analysis.sql ── DuckDB reads data/positions/*/*.jsonl.gz ──▶  the three questions
+ analysis.sql ── DuckDB reads data/ (history, arrivals, timetables, official archive) ──▶  the three questions and the backlog (FINDINGS.md)
  routes.csv / stops.csv / network.geojson ── built by build_crosswalk.py ──▶  names, colors, route lines
 ```
 
 Five files do the work: the poller, its timetable module, the map page,
-the SQL file, and the crosswalk builder. The poller's other module,
-`official_feed.py`, only archives. Everything else in the repo is
-optional, a one-off tool (`backfill_replay.py`, `backfill_routes.py`, `cadavl_detours.py`,
-`probe_cadence.py`), or one of the two extra views (`strips.html`,
+the SQL file, and the crosswalk builder. The poller's other two modules,
+`official_feed.py` and `cadavl_detours.py`, only archive. Everything else
+in the repo is optional, a one-off tool (`backfill_replay.py`,
+`backfill_routes.py`, `probe_cadence.py`), or one of the two extra views (`strips.html`,
 `schematic.html`, sharing `transit.js` and `pages.css`, with
 `build_schematic.py` making the schematic's layout).
 
@@ -131,7 +141,10 @@ optional, a one-off tool (`backfill_replay.py`, `backfill_routes.py`, `cadavl_de
 
 Runs forever as a scheduled task (see Running it). Each cycle, during
 service hours (04:00–24:00 local): fetch `/topo/vehicules`, normalize each
-bus into a flat row, then write four things.
+bus into a flat row, then write four things. Cycles start on a fixed 10 s
+clock (:00, :10, :20 …), not 10 s after the last one finished; a cycle takes
+1–4 s, so the old sleep-after-poll loop drifted to 11–14 s apart, and
+history from before the fix has those gaps.
 
 **History — one row per bus per poll.** This is a change from the current
 code, which archives the raw payload separately and writes a position row only
@@ -216,8 +229,8 @@ startup (`load_routes`). When a poll has buses on lines it doesn't know
 (`cadavl:<id>`), at most every 15 minutes it asks `/config/version`; if
 that moved past the version recorded in `network.geojson`, it rebuilds the
 crosswalk (`build_crosswalk.refresh`, a ~28 MB download) and reloads, so
-a renumbering fixes itself within a poll or two. `StaleTracker` does ghost
-detection; `parse_delay` turns the vendor's text into seconds.
+a renumbering fixes itself within a poll or two. `StaleTracker` counts
+unchanged polls; `parse_delay` turns the vendor's text into seconds.
 
 **Timetable and arrivals — `schedule.py`.** Once per service day (and at
 startup) the poller downloads `GTFS_MATA.zip` if the server's copy is newer
@@ -251,6 +264,14 @@ Every poll it then does two matches:
 Checked live: every arrival's actual − scheduled time agreed with the
 vendor's reported delay to within a minute. A failure here is logged and
 never costs a poll.
+
+Two limits, measured 2026-09-25. The log catches ~83–85% of the stops on
+a trip that ran (buses pass some stops between polls, or out of the
+feed). And at the end of a line the tracker still shows the finished
+trip's headsign while the bus waits, so what it logs there is the
+departure, credited to the trip that just ended; `analysis.sql` leaves
+line ends out of timing questions and times departures from the
+official feed instead.
 
 ### 2. Crosswalk — `build_crosswalk.py`
 
@@ -291,7 +312,10 @@ Encodings, per bus:
   replaying, from the frames), in the tier color, one segment per pair: bright,
   thick and solid where the bus just was, darker, thinner and fainter as it
   ages.
-- **Ghost** (`unchanged_polls` ≥ 30) = dashed hollow circle, no wedge.
+- **Still 5+ minutes** (`unchanged_polls` ≥ 30) = dashed hollow circle, no
+  wedge, "no GPS movement for N min" in the tooltip. The code calls it a
+  ghost, but it is usually a bus at layover; a dead tracker can't be told
+  apart until the bus reappears somewhere else.
 - Late buses are stacked on top of on-time ones.
 
 Around it: the whole network as hairlines and every stop as a small hollow
@@ -322,7 +346,7 @@ Clock times are Memphis time wherever the viewer is. On phones the panel
 takes the top of the screen and the map slides the clicked bus or stop
 into the clear area below it. Hover for route,
 headsign, delay text, load, fleet number. Top-right: buses in service, buses
-5+ min late, estimated riders (`CAPACITY = 40`). A dot goes red when the
+5+ min late, riders on board (load % × `CAPACITY = 50`). A dot goes red when the
 snapshot is older than 90 s. Bottom-left legend. Bottom bar: play/pause,
 a scrubber across the day's frames, the clock, replay speed (10× / 60× /
 300× real time), LIVE, and a date picker for earlier days — so any moment
@@ -406,24 +430,30 @@ SELECT *,
        to_timestamp(observed_at) AT TIME ZONE 'America/Chicago' AS t
 FROM read_json_auto('data/positions/*/positions.jsonl.gz', hive_partitioning = true);
 
--- Rows worth trusting: a delay was reported, it isn't a "1h+" cap,
--- and the GPS fix has moved in the last five minutes.
+-- Rows worth trusting for delay: a delay was reported, it isn't a "1h+"
+-- cap, and the bus hasn't sat still for 30+ polls (mostly layovers).
 CREATE VIEW good AS
 SELECT * FROM pos
 WHERE delay_seconds IS NOT NULL AND NOT delay_capped AND unchanged_polls < 30;
 
 -- 1. Which routes constantly run behind?
+-- On time = at most 1 min early and 5 min late; in the vendor's whole
+-- minutes (it never says "1 min"), early is 2+ min and late 6+ min.
 SELECT route_id,
        count(*)                                   AS bus_polls,
        round(median(delay_seconds) / 60, 1)       AS median_min_late,
-       round(avg((delay_seconds > 300)::int), 2)  AS share_over_5_min
+       round(avg((delay_seconds > 300)::int), 2)  AS share_over_5_min,
+       round(avg((delay_seconds < -60)::int), 2)  AS share_early,
+       round(avg((delay_seconds BETWEEN -60 AND 300)::int), 2) AS on_time
 FROM good
 GROUP BY route_id
 ORDER BY share_over_5_min DESC;
 
 -- 2. Which days are especially bad?
+-- `hours` is first to last bus recorded; a short one is a partial day.
 SELECT t::date                                    AS day,
        dayname(t::date)                           AS dow,
+       round(date_diff('minute', min(t), max(t)) / 60, 1) AS hours,
        round(median(delay_seconds) / 60, 1)       AS median_min_late,
        round(avg((delay_seconds > 300)::int), 2)  AS share_over_5_min
 FROM good
@@ -431,28 +461,53 @@ GROUP BY 1, 2
 ORDER BY share_over_5_min DESC;
 
 -- 3. How many people are riding right now?
--- CAPACITY is a placeholder; see open questions.
+-- The load % is riders out of 50 on every vehicle, so riders = % / 2.
 SELECT count(*)                                         AS buses_in_service,
-       round(sum(occupancy_pct) / 100.0 * 40)           AS riders_est
-FROM read_json_auto('data/latest.json')
+       sum(occupancy_pct) // 2                          AS riders
+FROM (SELECT unnest(vehicles, recursive := true)
+      FROM read_json_auto('data/latest.json'))
 WHERE unchanged_polls < 30;
 ```
+
+The file also defines views over the rest of `data/`: `ghost_rows` (the
+positions a dead tracker left behind, for anything spatial), `arrivals`,
+`sched` (the saved timetables, one row per scheduled call), `timepoints`,
+`line_ends`, `stops`, the official archive (`off_vehicles`, `off_trip_updates`,
+`off_alerts`), and two joins of them, `arrivals_due` (each arrival with
+the time its trip was due) and `trip_service` (each scheduled trip and
+whether any bus ran it). After the views come the queries behind
+`FINDINGS.md`, grouped as in `QUESTIONS.md` and tagged (`[Q1]`, `[GPS]`,
+`[MISSED]`, …) so the findings can cite them. The whole file takes about
+a minute; each query also runs on its own after the views.
 
 Variations (by hour of day, by route × weekday, riders over the day) are the
 same queries with a different `GROUP BY`. Add them to the file as they are
 needed; don't pre-build them.
 
-### 5. Detours — `cadavl_detours.py` (optional, deferred)
+### 5. Detours — `cadavl_detours.py`
 
-Already parses `/topo/refresh` into GeoJSON lines and a GTFS-RT alerts feed.
-Not required for any of the three questions. If wanted later: an hourly
-scheduled task writes `data/detours.geojson`, and `map.html` draws it as a second layer.
-Nothing to do now.
+The "detour impact" question (`QUESTIONS.md`) needs a record of which
+routes were detoured when, so the poller keeps one, like the official
+archive: once an hour `DetourLog.update` fetches `/topo/refresh` (~150 KB)
+and `/iv/message`, and when either changed since the last save, appends a
+line to `data/detours/dt=<UTC day>/detours.jsonl.gz` (see Data model). Days
+of detours cost a few KB. A failure is logged and never costs a poll; it
+waits for the next hour.
+
+`/iv/message` is the tracker's rider notices, and not only detours: "Route
+11 Out of service Outbound from Thomas & Whitney @ 7:45 PM. The next unit is
+scheduled to arrive at 8:39 PM" sits beside "Route 39 diverted. Stops: …".
+So the log also holds missed-trip notices from the tracker's side.
+
+Still not drawn on the map. `python cadavl_detours.py --sample refresh.json`
+parses a saved payload into `detours.geojson` and a GTFS-RT alerts feed, if
+a map layer is ever wanted.
 
 ### 6. Probes — `probe_cadence.py`
 
-One-off diagnostic. Run it once during service hours to settle the speed
-unit, set `SPEED_UNIT`, and forget about it.
+One-off diagnostic: polls fast for a few minutes to measure how often
+positions really change, and cross-checks the speed unit (settled as m/s
+from the archives, so there is nothing to set).
 
 ## Data model
 
@@ -471,15 +526,15 @@ queries rather than renaming partitions).
 | `route_color` | str | Hex from `routes.csv`; for the map |
 | `lat`, `lon` | float | |
 | `bearing` | int | Degrees 0–360 |
-| `speed_raw` | int | Unit unconfirmed |
-| `occupancy_pct` | int | Passenger load, percent of unknown capacity |
+| `speed_raw` | int | Metres per second, whole numbers; the odd impossible reading |
+| `occupancy_pct` | int | Passenger load as a percent of 50 riders, so always even; riders = `occupancy_pct / 2` |
 | `destination` | str | Headsign |
 | `next_stop_name` | str | Display name, not a GTFS stop_id |
 | `next_stop_eta_min` | int | |
 | `delay_seconds` | int | Positive = late; `0` = "on time"; null if unparseable |
 | `delay_raw` | str | Vendor text, e.g. "4 min late" |
 | `delay_capped` | bool | True for "1h+" values — a floor, not a measurement |
-| `unchanged_polls` | int | Consecutive polls with identical coordinates; ghost signal |
+| `unchanged_polls` | int | Consecutive polls with identical coordinates: parked, or a dead tracker |
 | `trip_id` | str | GTFS trip the bus is inferred to be running; null if unmatched (from 2026-09-24) |
 
 The official feed's archive, from 2026-09-25, is in
@@ -495,6 +550,22 @@ time). Enum values are the GTFS-RT names (`SCHEDULED`, `CANCELED`,
 
 DuckDB reads the lists with `unnest`. Every cancelled trip:
 `SELECT DISTINCT route_id, trip_id FROM read_json_auto('data/official/*/trip_updates.jsonl.gz') WHERE trip_status = 'CANCELED'`.
+(Most trips that never run are not marked; `trip_service` in
+`analysis.sql` finds them.)
+
+The detour log, from its first poller restart after 2026-09-25, is
+`data/detours/dt=YYYY-MM-DD/detours.jsonl.gz` (UTC date of `fetched_at`):
+one line whenever the detours or the tracker's rider messages changed
+since the last one saved (checked hourly, and once at every start).
+
+| Field | Notes |
+|---|---|
+| `fetched_at` | Unix seconds |
+| `detours` | One per line on detour: `route_id`, `stops` (stop codes it skips), `bypassed_segments` (count), `paths` (replacement geometry, lists of `[lon, lat]`) |
+| `messages` | Every rider message: `routes` it names, `text` |
+
+A route's detour runs from the first line that lists it to the first
+that doesn't.
 
 ## Running it
 
@@ -502,8 +573,9 @@ An always-on Windows machine at home. Chosen over the cloud free tiers:
 Google's e2-micro is free but its external IP is ~$3.65/month, Oracle's is
 $0 but has signup and idle-reclamation caveats, and a home box costs a few
 dollars a year in power. Needs are tiny: one 12 KB request every 10 s
-(plus the official feed's two of ~2 KB, and ~120 KB every 5 minutes),
-~40–55 MB/day of disk (history, replay frames, official archive).
+(plus the official feed's two of ~2 KB, ~120 KB every 5 minutes, and the
+detour check's ~150 KB an hour), ~40–55 MB/day of disk (history, replay
+frames, official archive; the detour log adds a few KB).
 
 Everything runs natively (Python, `http.server`, DuckDB); only "keep it
 running" is Windows-specific, and Task Scheduler does that. Install once
@@ -519,7 +591,8 @@ start at boot with nobody logged in and restart a minute after any crash,
 and opens port 8000 to the home LAN and Tailscale only:
 
 - `mata-poller` — `python -u cadavl_to_gtfs_rt.py`, output appended to
-  `data\poller.log` (a few hundred KB per day; delete it whenever).
+  `data\poller.log`, each line stamped with the local date and time (a few
+  hundred KB per day; delete it whenever).
 - `mata-web` — `python -m http.server 8000`; the map is at
   `http://localhost:8000/map.html`.
 
@@ -571,6 +644,7 @@ Failure modes and the response to each:
   panels say there's no timetable and everything else carries on.
 - Official GTFS-RT down → logged per feed; its archive has a gap and
   nothing else notices.
+- Detour endpoints down → logged; tried again the next hour.
 - Vendor changes the JSON shape → `normalize_vehicle` returns nothing useful;
   the `--sample` check against a freshly saved payload is the debugging tool.
 
@@ -586,24 +660,56 @@ Steps 1–4 are done. Each left the project working; net line count went down.
    (Task Scheduler), and `.gitignore` entries for generated files. Deploy
    and let it run.
 5. **After a week of data:** run the queries, sanity-check against personal
-   experience of the routes, then decide the open questions below.
+   experience of the routes, then decide the open questions below. Started
+   early (2026-09-25, on 1.8 days): the open questions are settled on that
+   data, `QUESTIONS.md` is worked through, results in `FINDINGS.md`. Still
+   to do: rerun on a full week and the sanity check.
 
 ## Open questions
 
-- **Bus capacity.** `occupancy_pct` is a percentage of something. A constant
-  of 40 riders at 100% is a reasonable first guess for a 40-foot bus; the
-  right value may vary by `equipment_no` (fleet number), and the trolley is
-  different. Until confirmed, ridership figures are relative, not absolute.
-- **Ghost threshold.** 30 unchanged polls (five minutes) is a guess. A bus
-  at a layover legitimately sits still that long (when it doesn't drop out
-  of the feed altogether); check how many rows the filter drops per route
-  before trusting it.
-- **Late threshold.** Five minutes is the usual transit-industry cutoff for
-  "late". Adjust if MATA publishes its own on-time standard.
-- **Speed unit.** Only matters if our GTFS-RT feed gets a consumer. The
-  official feed reports speed for the same buses (m/s by the spec; match
-  on fleet number), so pairing the two archives could settle it without
-  `probe_cadence.py`.
+- **Bus capacity — settled 2026-09-25: 100% is 50 riders, on every
+  vehicle.** Every one of 340,389 readings, from every fleet series and
+  the trolley, is an even percentage, and together they take all 51 even
+  values from 0 to 100: the vendor divides a rider count by 50. (A per-bus
+  capacity like 38 or 40 would give odd values.) So riders on board =
+  `occupancy_pct / 2`, a count as good as the counters, not an estimate
+  from a guessed capacity; `CAPACITY = 50` in `map.html`. For scale, MATA's
+  own loading guideline (2012 Short Range Transit Plan) gives a 40-foot
+  bus 40 seats and a 48-rider maximum (120% of seats at peak): 80% is a
+  full seated load, 100% about the most MATA plans to carry. The official
+  feed's occupancy categories are fixed bands of the same number
+  (standing room only from ~11 riders, "full" from ~41) and don't say
+  whether seats are free; don't use them for crowding.
+- **Ghost threshold — settled 2026-09-25** (on 1.8 days; recheck after a
+  week). 30 still polls almost never means a dead tracker: of 183 such
+  streaks, 127 were layovers at a route's end and 45 were holds mid-route
+  (the bus later drove off from the same spot); 8 were dead trackers.
+  Dead trackers show instead as a still streak, usually 1–5 minutes, that
+  ends with the bus reappearing 200 m+ away; the official feed's report
+  times freeze over the same stretches. `ghost_rows` in `analysis.sql`
+  finds them. The vendor freezes the delay along with the position, so
+  swapping one rule for the other moves no route's late share by more than
+  a point: `good` keeps the 30-poll rule, and spatial queries drop
+  `ghost_rows`. Bus 458 alone has nearly half the ghost rows (15% of its
+  polls). Details in `FINDINGS.md`.
+- **Late threshold — kept at 5 minutes (2026-09-25).** MATA has a
+  Board-adopted on-time standard (its 2014 service standards, checked in
+  the Title VI monitoring reports) and publishes monthly fixed-route
+  on-time figures (Memphis Open Data Hub, "MATA On Time Performance":
+  roughly 45–70% since 2015), but the minute window wasn't found in
+  anything public; the data hub's data dictionary PDF may have it.
+  So `[Q1]` uses the usual window, at most 1 minute early and 5 late,
+  and reports `on_time` and `share_early` beside `share_over_5_min`. On
+  it, 73% of bus-polls are on time, 75% of departures from mid-route
+  timepoints, and 59% of departures from a trip's first stop (`[DEPART]`,
+  from MATA's feed: 40% leave 5+ min late), the figure nearest MATA's
+  own. If MATA's definition turns up, change the two numbers in `[Q1]`.
+- **Speed unit — settled 2026-09-25: metres per second.** Paired with the
+  official feed (m/s by the spec) on fleet number and identical position,
+  i.e. the same report, the two speeds are equal in 97% of 2,557 moving
+  pairs. Independently, the distance buses cover over 5-minute windows is
+  1.03 × `speed_raw` × time (mph would give 0.45, km/h 0.28). Our
+  `vehicle_positions.pb` now carries speed, skipping readings over 40 m/s.
 
 ## Non-goals
 

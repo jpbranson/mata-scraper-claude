@@ -51,8 +51,8 @@ bunching / headways and where delay accumulates.
 - **Ghost buses / GPS reliability.** Share of polls with high
   `unchanged_polls`, by `equipment_no`. Chronically bad trackers corrupt the
   delay stats, so settle this before trusting anything else.
-- **Speed profiles.** Average `speed_raw` by route segment and hour (relative
-  comparisons work without knowing the unit). Slow segments on a map = where
+- **Speed profiles.** Average `speed_raw` (metres per second) by route
+  segment and hour. Slow segments on a map = where
   bus lanes or signal priority would help.
 
 ## 4. From the official GTFS-RT archive
@@ -76,8 +76,9 @@ bunching / headways and where delay accumulates.
 
 ## 5. Needs more than the current design
 
-- **Detour impact.** Delay and ridership on detoured vs normal days — needs
-  `cadavl_detours.py` running hourly so there's a detour log. Cheap to add.
+- **Detour impact.** Delay and ridership on detoured vs normal days. The
+  poller now logs detours hourly (`data/detours/`, see `DESIGN.md`), from
+  its first restart after 2026-09-25; needs weeks of that log.
 - **Self-computed schedule adherence** (instead of the vendor's number) —
   the timetable and trip matching now exist (`schedule.py`), and actual −
   scheduled agreed with the vendor's delay when checked. A non-goal in
