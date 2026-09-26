@@ -14,12 +14,12 @@ under "Uncommitted changes".
 | # | Step | Status |
 |---|---|---|
 | 1 | Let the poller collect a week of data (until ~2026-10-01) | WAITING |
-| 2a | Poller: poll on a fixed 10 s clock (was 10 s sleep *after* each poll → 11–14 s) | Code written + live-tested; NOT deployed (see 2c) |
-| 2b | Poller: timestamp every `poller.log` line | Code written + live-tested; NOT deployed (see 2c) |
-| 2c | Deploy 2a/2b (restart `mata-poller`), verify cadence + log in live data | BLOCKED (needs you: run `.\ops\update.ps1`) |
+| 2a | Poller: poll on a fixed 10 s clock (was 10 s sleep *after* each poll → 11–14 s) | DONE — live since 20:12:38; verified (379 of 380 polls on the 10 s clock) |
+| 2b | Poller: timestamp every `poller.log` line | DONE — live since 20:12:38; verified |
+| 2c | Deploy 2a/2b (restart `mata-poller`), verify cadence + log in live data | DONE — you restarted at 20:12:38 (and again at 21:12:45); verified 21:15 |
 | 3a | Run `analysis.sql`, record results (re-run after a week; human sanity check) | Ran + recorded in FINDINGS.md; WAITING (week of data) + needs your sanity check |
 | 3b | Open question: ghost threshold (226xx buses, layover vs dead GPS) | DONE (on 1.8 days; recheck with a week) |
-| 3c | Open question: speed unit (tracker `speed_raw` vs official feed / computed speed) | DONE (m/s); poller change NOT deployed (see 2c) |
+| 3c | Open question: speed unit (tracker `speed_raw` vs official feed / computed speed) | DONE (m/s); speed in our feed since 20:12, verified |
 | 3d | Open question: bus capacity (40 at 100%?) | DONE (100% = 50 riders; riders = pct / 2) |
 | 3e | Open question: late threshold (MATA's own on-time standard?) | DONE (kept 5 min; MATA window not public → human check) |
 | 4a | QUESTIONS: bunching and effective headways | DONE (on 1.8 days) |
@@ -27,23 +27,17 @@ under "Uncommitted changes".
 | 4c | QUESTIONS: missed service (cancelled trips, alerts) | DONE (on 1.8 days; by weekday needs weeks) |
 | 4d | QUESTIONS: does our trip matching hold up vs official trip IDs | DONE (99.8% agree; 1 day of official data) |
 | 4e | QUESTIONS: the rest of groups 1–4 (and group 5's stop-level waits) as the data allows | DONE for what 1.8 days allow; weekday/weather/events WAITING (weeks); detour impact after 5a + weeks |
-| 5a | Deferred: detour logging (needed for "detour impact") | Code written + live-tested; NOT deployed (see 2c) |
+| 5a | Deferred: detour logging (needed for "detour impact") | DONE — logging since 20:12:42 (`data/detours/`); verified |
 | 5b | Deferred: our own `vehicle_positions.pb` — delete only if it gets in the way | DONE — checked, not in the way; kept, nothing changed |
 | 6 | (Your request, 20:18) Commit + push; publish FINDINGS.md as a page | DONE — pushed; page published (private until you share it); FINDINGS.md refreshed to the same 20:21 snapshot |
+| 7 | (Your request, 21:14) Move the page scripts into the repo; check the deploy | DONE — `findings_page/` committed and pushed; deploy verified |
 
 ## For human review
 
 (Items that need you: decisions, things I couldn't do, sanity checks.)
 
-- **Deploy the poller changes (2c).** The running poller still has the old
-  code (Python loaded it at 05:45). I can't restart it: this shell gets
-  "access denied" on the task's processes, and auto mode refused the attempt
-  as interfering with a running workload. From your own PowerShell in the
-  repo folder: `.\ops\update.ps1` (restarts both tasks; a few seconds of
-  data lost). Then check `data\poller.log` ends in lines like
-  `2026-09-25 19:09:20 31 vehicles, 26 moved`, 10 s apart. All the poller
-  changes (2a, 2b, 3c speed in the feed, 5a detour log) are in, so one
-  restart deploys them all; `data\detours\` should appear within a minute.
+- ~~Deploy the poller changes (2c).~~ Done: you ran `.\ops\update.ps1` at
+  20:12 (and again at 21:12); checked at 21:15, all four changes are live.
 - **Sanity-check the route ranking (3a)** in FINDINGS.md against your own
   experience of the routes (DESIGN step 5), and rerun `analysis.sql` after
   a full week (~Oct 1).
@@ -53,7 +47,7 @@ under "Uncommitted changes".
   `/artifacts` in Claude Code or at claude.ai/code/artifacts) is private
   until you share it from its Share menu. It and FINDINGS.md use data up to Fri 20:21,
   two hours before Friday's service ended; rebuild both from a fresh copy
-  (scratchpad `page_data.py` + `build_page.py`) if you want Friday whole.
+  (`findings_page/`, see its README) if you want Friday whole.
 - **MATA's on-time window (3e).** Not public anywhere I could reach. The
   city's data hub page for "MATA On Time Performance"
   (data.memphistn.gov/datasets/mata-on-time-performance-1/about) links a
@@ -63,7 +57,7 @@ under "Uncommitted changes".
 
 ## Uncommitted changes
 
-(none yet)
+(none: everything up to the 21:35 entry is committed and pushed)
 
 ## Log (newest last)
 
@@ -198,3 +192,27 @@ first logged guessed clock times, several hours off.)
 - 21:09 — FINDINGS.md refreshed to the 20:21 copy (analysis.sql rerun whole
   into `scratchpad/full_run_2021.txt`, plus `scratchpad/checks.py` for the
   one-off figures), so the file and the page agree.
+- 21:11 — Committed and pushed 99a8b44 (FINDINGS.md refresh, [HEADWAY]
+  tiebreak, this log), as part of step 6.
+- 21:14 — Your requests: move the page scripts into the repo; check that
+  the poller changes are deployed.
+- 21:15 — Deploy checked, read-only (`scratchpad/deploy_check.py`, on
+  copies). Both tasks last started 21:12:45 (your `update.ps1`), but the
+  new code first ran at 20:12:38: that's the first time-stamped log line,
+  so an earlier restart at 20:12 had already deployed it. Since 20:12:38:
+  383 log lines, all stamped, no poll errors; 379 of 380 stored polls on
+  the 10 s clock (the exception is the restart); `vehicle_positions.pb`
+  carries speed for all 14 vehicles; `data/detours/dt=2026-09-26/` has 2
+  records (route 39's detour and rider messages), written 20:12:42 and
+  21:12:51; the map server sends `map.html` with `CAPACITY = 50`.
+- 21:31 — Page scripts moved to `findings_page/` with a README; paths now
+  relative to the repo, the feed day in one constant (`FEED_DAY`). Ties now
+  broken in every sort and pick, so two runs on one copy give byte-identical
+  output. Tested end to end on a fresh copy (to 21:20, 1 min 44 s), then
+  rebuilt from the 20:21 copy: same as the published page except the 30th
+  delay-map circle (a tie at 13.5 bus-min/day) and six stops drawn 20–155 m
+  from where they were (several stops share a name). `snapshot/` now holds
+  the 20:21 copy and `out/` its build. DESIGN.md, FINDINGS.md and
+  QUESTIONS.md updated.
+- 21:35 — Your request: committed and pushed `findings_page/`, the doc
+  updates and this log.

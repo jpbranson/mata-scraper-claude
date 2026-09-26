@@ -94,8 +94,8 @@ usually a layover, as DESIGN.md now says.
   are impossible (41–347).
 
 Done: `cadavl_to_gtfs_rt.py` drops the `SPEED_UNIT` switch and writes
-speed into `vehicle_positions.pb`, skipping readings over 40 m/s (takes
-effect when the poller is restarted).
+speed into `vehicle_positions.pb`, skipping readings over 40 m/s (live
+since the poller restart on 2026-09-25 at 20:12).
 
 ### Bus capacity — settled: 100% = 50 riders, every vehicle
 
@@ -370,7 +370,7 @@ placed at its scheduled time plus its own median delay.)
 - **Weekday vs weekend, weather, events** (groups 1–2): need weeks of data;
   the queries (`[Q2]`, `[HOUR]` + `dayname`, `[RIDERS_DAY]`) are ready.
 - **Detour impact** (group 5): needs weeks of the poller's new detour log
-  (`data/detours/`), which starts when the poller is next restarted.
+  (`data/detours/`), which has been running since 2026-09-25 at 20:12.
 - **Self-computed schedule adherence** (group 5): still a non-goal. The
   vendor's delay agrees with actual − scheduled, and `sched` now makes it a
   one-line join if ever needed.

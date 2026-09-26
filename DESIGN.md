@@ -124,6 +124,7 @@ rows):
  strips.html, schematic.html ── data/latest.json every 10 s + route files ──▶  route strips, subway-style map
  schematic.json ── built by build_schematic.py with LOOM (occasionally, on Linux/WSL) ──▶  the schematic layout
  analysis.sql ── DuckDB reads data/ (history, arrivals, timetables, official archive) ──▶  the three questions and the backlog (FINDINGS.md)
+ findings_page/ ── a copy of data/ + analysis.sql's views ──▶  FINDINGS.md as one page of charts (published as a claude.ai artifact)
  routes.csv / stops.csv / network.geojson ── built by build_crosswalk.py ──▶  names, colors, route lines
 ```
 
@@ -131,9 +132,10 @@ Five files do the work: the poller, its timetable module, the map page,
 the SQL file, and the crosswalk builder. The poller's other two modules,
 `official_feed.py` and `cadavl_detours.py`, only archive. Everything else
 in the repo is optional, a one-off tool (`backfill_replay.py`,
-`backfill_routes.py`, `probe_cadence.py`), or one of the two extra views (`strips.html`,
+`backfill_routes.py`, `probe_cadence.py`), one of the two extra views (`strips.html`,
 `schematic.html`, sharing `transit.js` and `pages.css`, with
-`build_schematic.py` making the schematic's layout).
+`build_schematic.py` making the schematic's layout), or the findings page
+(`findings_page/`).
 
 ## Components
 
@@ -483,6 +485,12 @@ a minute; each query also runs on its own after the views.
 Variations (by hour of day, by route × weekday, riders over the day) are the
 same queries with a different `GROUP BY`. Add them to the file as they are
 needed; don't pre-build them.
+
+`findings_page/` draws the findings as one page of charts. `snapshot.py`
+copies `data/` (the queries never touch the live files), `page_data.py`
+creates this file's views over the copy and runs the page's own queries,
+and `build_page.py` puts the result into `template.html`. Its README has
+the steps and what to change before publishing a rebuild.
 
 ### 5. Detours — `cadavl_detours.py`
 

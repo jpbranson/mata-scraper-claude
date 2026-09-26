@@ -1,0 +1,1208 @@
+<title>Memphis Buses, Measured</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
+<style>
+:root {
+  --paper: #fffff8;
+  --ink: #1b1b18;
+  --ink2: #4d4c46;
+  --muted: #6f6e66;
+  --rule: #dcdbd2;
+  --faint: #f1f0e6;
+  --ran: #b0afa5;
+  --ontime: #8f8e85;
+  --late: #d03b3b;
+  --early: #2a78d6;
+  --late-wash: rgba(208, 59, 59, .13);
+  --band: rgba(27, 27, 24, .07);
+  --band2: rgba(27, 27, 24, .16);
+  --unknown: rgba(27, 27, 24, .045);
+  --shadow: 0 2px 12px rgba(27, 27, 24, .14);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #151513;
+    --ink: #ecebe3;
+    --ink2: #bdbcb2;
+    --muted: #95948b;
+    --rule: #35342f;
+    --faint: #201f1c;
+    --ran: #5e5d56;
+    --ontime: #8a897f;
+    --late: #d03b3b;
+    --early: #3987e5;
+    --late-wash: rgba(208, 59, 59, .24);
+    --band: rgba(236, 235, 227, .08);
+    --band2: rgba(236, 235, 227, .18);
+    --unknown: rgba(236, 235, 227, .05);
+    --shadow: 0 2px 14px rgba(0, 0, 0, .55);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #151513;
+  --ink: #ecebe3;
+  --ink2: #bdbcb2;
+  --muted: #95948b;
+  --rule: #35342f;
+  --faint: #201f1c;
+  --ran: #5e5d56;
+  --ontime: #8a897f;
+  --late: #d03b3b;
+  --early: #3987e5;
+  --late-wash: rgba(208, 59, 59, .24);
+  --band: rgba(236, 235, 227, .08);
+  --band2: rgba(236, 235, 227, .18);
+  --unknown: rgba(236, 235, 227, .05);
+  --shadow: 0 2px 14px rgba(0, 0, 0, .55);
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  padding-inline: 16px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "EB Garamond", Garamond, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  font-size: 19px;
+  line-height: 1.55;
+  font-variant-numeric: oldstyle-nums proportional-nums;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+article { max-width: 1180px; margin: 0 auto; padding-block: 44px 96px; }
+h1 { font-weight: 400; font-size: clamp(2.4rem, 6vw, 3.4rem); line-height: 1.02; margin: 0 0 .5rem; letter-spacing: -.012em; text-wrap: balance; }
+.subtitle { font-style: italic; font-size: 1.4rem; line-height: 1.3; color: var(--ink2); margin: 0 0 1rem; text-wrap: balance; }
+.dateline { font-size: .84rem; line-height: 1.5; color: var(--muted); margin: 0 0 2.2rem; font-variant-numeric: lining-nums; letter-spacing: .01em; }
+h2 { font-weight: 400; font-style: italic; font-size: 1.8rem; line-height: 1.15; margin: 3.4rem 0 .7rem; text-wrap: balance; }
+h3 { font-weight: 400; font-style: italic; font-size: 1.32rem; line-height: 1.2; margin: 2.2rem 0 .5rem; text-wrap: balance; }
+p { margin: 0 0 1.1rem; }
+.subtitle, .dateline, section > p, section > h2, section > h3, section > ul, section > figure, section > .block { width: 55%; }
+section > figure.fullwidth { width: 90%; }
+section::after { content: ""; display: table; clear: both; }
+.marginnote {
+  float: right; clear: right; margin-right: -60%; width: 50%;
+  margin-top: .3rem; margin-bottom: 1.1rem;
+  font-size: .8rem; line-height: 1.4; color: var(--ink2);
+}
+.marginnote code, .tag { font-family: inherit; font-size: .92em; font-variant-caps: all-small-caps; letter-spacing: .06em; color: var(--muted); }
+figure { margin: 1.4rem 0 2.2rem; padding: 0; }
+figcaption { font-size: .8rem; line-height: 1.4; color: var(--ink2); margin-top: .45rem; max-width: 62ch; }
+.nm { font-variant-numeric: lining-nums tabular-nums; }
+.sc { font-variant-caps: all-small-caps; letter-spacing: .05em; }
+em { font-style: italic; }
+a { color: inherit; text-decoration-color: var(--rule); text-underline-offset: 3px; }
+a:hover { text-decoration-color: var(--ink2); }
+:focus-visible { outline: 2px solid var(--early); outline-offset: 2px; }
+
+.legend { display: flex; flex-wrap: wrap; gap: .25rem 1.2rem; font-size: .8rem; color: var(--ink2); margin: 0 0 .5rem; font-variant-numeric: lining-nums; }
+.legend span { display: inline-flex; align-items: center; gap: .4rem; }
+.k { display: inline-block; flex: none; }
+.k-tick { width: 2px; height: 12px; }
+.k-line { width: 16px; height: 2px; }
+.k-dot { width: 8px; height: 8px; border-radius: 50%; }
+.k-sq { width: 12px; height: 9px; }
+.k-late { background: var(--late); }
+.k-early { background: var(--early); }
+.k-ran { background: var(--ran); }
+.k-ontime { background: var(--ontime); }
+.k-ink { background: var(--ink); }
+.k-ink2 { background: var(--ink2); }
+.k-band { background: var(--band); }
+.k-band2 { background: var(--band2); }
+.k-canc { width: 5px; height: 5px; border-radius: 50%; background: var(--late); }
+
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; overflow: visible; }
+svg text { font-family: inherit; font-size: 13px; fill: var(--muted); font-variant-numeric: lining-nums tabular-nums; }
+svg .t-ink { fill: var(--ink); }
+svg .t-ink2 { fill: var(--ink2); }
+svg .t-it { font-style: italic; }
+svg .t-sm { font-size: 12px; }
+svg .t-lg { font-size: 16px; }
+svg .t-strong { font-weight: 600; }
+svg .halo { paint-order: stroke; stroke: var(--paper); stroke-width: 3px; stroke-linejoin: round; }
+svg .grid { stroke: var(--rule); stroke-width: 1; shape-rendering: crispEdges; }
+svg .base { stroke: var(--ink2); stroke-width: 1; shape-rendering: crispEdges; }
+svg .tk-ran { stroke: var(--ran); stroke-width: 1.5; }
+svg .tk-miss { stroke: var(--late); stroke-width: 2; }
+svg .f-late { fill: var(--late); }
+svg .f-early { fill: var(--early); }
+svg .f-ontime { fill: var(--ontime); }
+svg .f-ink { fill: var(--ink); }
+svg .f-ink2 { fill: var(--ink2); }
+svg .f-paper { fill: var(--paper); }
+svg .f-ran { fill: var(--ran); }
+svg .ring { stroke: var(--paper); stroke-width: 2; }
+svg .l-late, svg .l-early, svg .l-ink, svg .l-ink2, svg .l-ran, svg .l-thin { fill: none; stroke-linejoin: round; stroke-linecap: round; }
+svg .l-late { stroke: var(--late); stroke-width: 2; }
+svg .l-early { stroke: var(--early); stroke-width: 2; }
+svg .l-ink { stroke: var(--ink); stroke-width: 2; }
+svg .l-ink2 { stroke: var(--ink2); stroke-width: 1.5; }
+svg .l-ran { stroke: var(--ran); stroke-width: 1.5; }
+svg .l-thin { stroke: var(--ink2); stroke-width: 1; }
+svg .w-late { stroke: var(--late); }
+svg .w-early { stroke: var(--early); }
+svg .w-ink { stroke: var(--ink); }
+svg .w-ink2 { stroke: var(--ink2); }
+svg .thick { stroke-width: 3.5; stroke-linecap: butt; }
+svg .hair { stroke-width: 1; }
+svg .o-late { fill: var(--paper); stroke: var(--late); stroke-width: 1.5; }
+svg .o-early { fill: var(--paper); stroke: var(--early); stroke-width: 1.5; }
+svg .o-ink2 { fill: var(--paper); stroke: var(--ink2); stroke-width: 1.5; }
+svg .band { fill: var(--band); }
+svg .band2 { fill: var(--band2); }
+svg .wash-late { fill: var(--late-wash); }
+svg .unknown { fill: var(--unknown); }
+svg .net { fill: none; stroke: var(--ran); stroke-width: .9; stroke-linejoin: round; stroke-linecap: round; opacity: .75; }
+svg .seg { stroke: var(--ink); stroke-width: 3; stroke-linecap: round; }
+svg .hub { fill: var(--paper); stroke: var(--ink2); stroke-width: 1.5; }
+svg .xhair { stroke: var(--ink2); stroke-width: 1; shape-rendering: crispEdges; pointer-events: none; }
+svg .hit { fill: transparent; pointer-events: all; }
+svg .hit:hover, svg .hit:focus-visible { fill: var(--band); }
+svg .hit.clear:hover, svg .hit.clear:focus-visible { fill: transparent; }
+svg .hit:focus { outline: none; }
+svg .hit-line { fill: none; stroke: transparent; stroke-width: 14; pointer-events: stroke; }
+.spark { display: inline-block; vertical-align: -2px; margin: 0 .15em; overflow: visible; }
+
+details.tv { margin-top: .3rem; font-size: .8rem; }
+details.tv summary { cursor: pointer; color: var(--muted); font-style: italic; width: max-content; list-style-position: outside; }
+.tv-wrap { overflow-x: auto; margin-top: .4rem; max-height: 26rem; overflow-y: auto; }
+.tv-wrap table, table.plain { border-collapse: collapse; font-variant-numeric: lining-nums tabular-nums; font-size: .8rem; }
+.tv-wrap th, .tv-wrap td, table.plain th, table.plain td { padding: .15rem .6rem; border-bottom: 1px solid var(--rule); text-align: right; white-space: nowrap; }
+.tv-wrap th, table.plain th { font-weight: 500; color: var(--ink2); position: sticky; top: 0; background: var(--paper); }
+.tv-wrap th:first-child, .tv-wrap td:first-child, table.plain th:first-child, table.plain td:first-child { text-align: left; }
+
+.rank { list-style: none; padding: 0; margin: .4rem 0 0; display: grid; gap: .35rem; }
+.rank li { display: grid; grid-template-columns: 1fr auto; gap: .1rem .5rem; align-items: baseline; }
+.rank .rb { grid-column: 1 / -1; height: 3px; background: var(--late); border-radius: 0 2px 2px 0; }
+.rank .rv { font-variant-numeric: lining-nums tabular-nums; color: var(--ink); }
+
+.scroll { overflow-x: auto; }
+table.rt { width: 100%; border-collapse: collapse; font-size: .84rem; font-variant-numeric: lining-nums tabular-nums; }
+table.rt th { font-weight: 400; font-style: italic; color: var(--ink2); text-align: right; padding: .2rem .45rem .35rem; border-bottom: 1px solid var(--ink2); white-space: nowrap; vertical-align: bottom; }
+table.rt th button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; font-style: italic; }
+table.rt th[aria-sort] button::after { content: " \2193"; font-style: normal; }
+table.rt th[aria-sort="ascending"] button::after { content: " \2191"; }
+table.rt td { padding: .22rem .45rem; border-bottom: 1px solid var(--rule); text-align: right; white-space: nowrap; }
+table.rt th:first-child, table.rt td:first-child { text-align: left; }
+table.rt .rn { font-weight: 600; margin-right: .4rem; }
+table.rt .rname { color: var(--ink2); font-variant-caps: all-small-caps; letter-spacing: .04em; }
+.cb { display: inline-flex; align-items: center; gap: .45rem; justify-content: flex-end; }
+.track { display: inline-block; width: 64px; height: 8px; background: var(--faint); position: relative; }
+.fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 0 2px 2px 0; }
+.fill.late { background: var(--late); }
+.fill.early { background: var(--early); }
+.fill.ontime { background: var(--ontime); }
+.fill.ink { background: var(--ink2); }
+.cbv { min-width: 2.6em; display: inline-block; }
+
+#tip {
+  position: fixed; z-index: 30; pointer-events: none;
+  background: var(--paper); color: var(--ink);
+  border: 1px solid var(--rule); border-radius: 4px; box-shadow: var(--shadow);
+  padding: .4rem .6rem .45rem; max-width: 300px;
+  font-size: 15px; line-height: 1.35; font-variant-numeric: lining-nums tabular-nums;
+}
+#tip .tip-h { font-style: italic; color: var(--ink2); margin-bottom: .15rem; }
+#tip .tip-r strong { font-weight: 600; }
+#tip .tip-l { color: var(--ink2); }
+#tip .tip-k { display: inline-block; width: 12px; height: 2px; margin-right: 6px; vertical-align: middle; }
+
+.note { font-size: .8rem; line-height: 1.4; color: var(--ink2); margin: .45rem 0 1.4rem; }
+footer { font-size: .8rem; color: var(--muted); margin-top: 3rem; border-top: 1px solid var(--rule); padding-top: .8rem; width: 55%; font-variant-numeric: lining-nums; }
+footer code { font-family: inherit; font-variant-caps: all-small-caps; letter-spacing: .05em; }
+
+@media (max-width: 820px) {
+  body { font-size: 18px; }
+  .subtitle, .dateline, section > p, section > h2, section > h3, section > ul, section > figure, section > figure.fullwidth, section > .block, footer { width: 100%; }
+  .marginnote { float: none; display: block; width: auto; margin: .5rem 0 1.1rem; padding-left: .75rem; border-left: 1px solid var(--rule); }
+}
+</style>
+
+<article>
+  <header>
+    <h1>Memphis Buses, Measured</h1>
+    <p class="subtitle">Two weekdays of MATA service, read from the agency&rsquo;s own bus tracker and its GTFS-Realtime feed</p>
+    <p class="dateline">Thursday 24 September 2026, a full service day, and Friday 25 September to 20:20 &middot; 351,576 bus positions from 11,030 polls of MATA&rsquo;s bus tracker &middot; 1,640 snapshots of MATA&rsquo;s official feed from Friday 05:45 &middot; 1,269 scheduled trips checked</p>
+  </header>
+
+  <section class="lede">
+    <p><span class="marginnote">Positions, delays and loads come from MATA&rsquo;s public bus tracker, polled several times a minute. Trip IDs, departures and countdowns come from MATA&rsquo;s GTFS-Realtime feed. The timetable is MATA&rsquo;s published GTFS. Each graphic names the query in <code>analysis.sql</code> that made it.</span>Across these two days MATA&rsquo;s timetable called for 1,269 trips that can be checked, and 185 of them never ran: no bus appeared on them, in the tracker or in MATA&rsquo;s own feed. That is one trip in seven, spread across the whole day <span class="spark" id="spark-missed"></span> and worst at 6&nbsp;a.m., when 23% of trips never left.</p>
+    <p>The trips that did run left their first stop a median of 4.2 minutes behind schedule, and on most routes made the time back on the road, where the timetable has slack. They almost never bunched; at intervals of 45 to 120 minutes a late bus is simply late. A rider who reached a stop two minutes early waited a median of 4.9 minutes for the next bus, and more than a quarter of an hour 23% of the time.</p>
+  </section>
+
+  <section id="missed">
+    <h2>The trips that never came</h2>
+    <p>Each tick below is one trip in MATA&rsquo;s timetable, placed at the minute it was due to leave its first stop. Gray ticks ran. Red ticks never did: no bus was seen on them by the tracker or by MATA&rsquo;s feed, which agree on 464 of the 471 Friday trips the feed saw running. Routes are ordered by the share of their trips that never ran.</p>
+    <figure class="fullwidth">
+      <div class="legend"><span><i class="k k-tick k-ran"></i>ran</span><span><i class="k k-tick k-late"></i>never ran</span><span><i class="k k-canc"></i>never ran, and marked canceled in MATA&rsquo;s feed</span></div>
+      <div class="chart" id="fig-barcode"></div>
+      <figcaption>Scheduled trips by route and departure time. Friday counts trips due by 19:50. The right-hand column gives trips that never ran, of those scheduled. <span class="tag">[missed]</span></figcaption>
+      <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-barcode"></div></details>
+    </figure>
+    <p><span class="marginnote">MATA&rsquo;s own records undercount this. Its feed marked 27 of Friday&rsquo;s 101 unrun trips as canceled, and 5 trips it marked canceled did run. Its 34 rider alerts that day are dispatchers&rsquo; free text, such as &ldquo;Route 1 is not running from William Hudson at 5:15a,&rdquo; and some carry the wrong route tag.</span>Some routes lost whole mornings. Route 01 (Union) lost 2 of its 45 trips on Thursday. On Friday the first of its trips to run was the 12:45, and it lost 31 of 40. On Thursday route 69 (Winchester) ran nothing before its 14:30 trip and lost 13 of 17, and route 53 (Summer) lost 19 of 31. Routes 04, 07, 13, 40 and the trolley lost nothing on either day.</p>
+  </section>
+
+  <section id="late">
+    <h2>Late from the first stop</h2>
+    <p>MATA&rsquo;s feed holds each bus at the first stop of its next trip until it leaves, which makes it a good clock for departures. Of 455 departures on Friday, 60% left on time, at most a minute early or five minutes late. Forty percent left more than five minutes late. Three left early.</p>
+    <figure>
+      <span class="marginnote">Minutes between scheduled and actual departure from the first stop, Friday, every route. Bars inside the bracket are on time. <span class="tag">[depart]</span></span>
+      <div class="chart" id="fig-depart"></div>
+      <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-depart"></div></details>
+    </figure>
+    <p>Once under way, most routes recover. Following each trip from the first stop the tracker logged to the last, 15 of 24 routes finish more than two minutes earlier than they started, so their timetables carry slack. Six routes lose more time on the road: 02, 28, 01, 13, 36 and 08.</p>
+    <figure>
+      <span class="marginnote">Mean delay at the first and last stops logged on each trip, for trips logged over 20 minutes or more, ends of lines left out. Route 02 trips start 4.2 minutes late on average and end 8.0 late. <span class="tag">[where_route]</span></span>
+      <div class="legend"><span><svg class="k" width="10" height="10" aria-hidden="true"><circle cx="5" cy="5" r="3.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>first stop logged</span><span><i class="k k-dot k-ink2"></i>last stop logged</span><span><i class="k k-line k-late"></i>later by the end</span><span><i class="k k-line k-early"></i>earlier by the end</span></div>
+      <div class="chart" id="fig-startend"></div>
+      <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-startend"></div></details>
+    </figure>
+    <p>The late direction is the one leaving downtown. On 10 of the 17 bus routes that run to William Hudson Transit Center, buses leaving it are five or more minutes late at least ten points more often than buses heading toward it. Only 28 (Airport) and 40 (Stage &amp; Lauderdale) lean the other way.</p>
+    <figure>
+      <span class="marginnote">Share of bus-polls five or more minutes late, toward and away from William Hudson Transit Center. Buses that reach downtown late turn around late. The trolley and routes that don&rsquo;t reach downtown are left out. <span class="tag">[direction]</span></span>
+      <div class="legend"><span><i class="k k-line k-late"></i>worse leaving downtown, by 10+ points</span><span><i class="k k-line k-ran"></i>worse leaving, by less</span><span><i class="k k-line k-early"></i>worse heading downtown</span></div>
+      <div class="chart" id="fig-direction"></div>
+      <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-direction"></div></details>
+    </figure>
+    <p>Through the day, lateness builds in the morning and peaks in the afternoon <span class="spark" id="spark-late"></span>. From 15:00 to 17:59 more than a quarter of bus-polls run five minutes late. After 21:00 the problem reverses and buses run early, 27% of polls at 21:00 and 40% at 22:00, which points to evening timetables with too much time in them.</p>
+    <figure>
+      <span class="marginnote">Share of bus-polls five or more minutes late and two or more minutes early, by hour, both days, every route. <span class="tag">[hour]</span></span>
+      <div class="legend"><span><i class="k k-line k-late"></i>5+ min late</span><span><i class="k k-line k-early"></i>2+ min early</span></div>
+      <div class="chart" id="fig-hour"></div>
+      <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-hour"></div></details>
+    </figure>
+    <h3>Route by route</h3>
+    <figure class="fullwidth">
+      <div class="chart" id="fig-multiples"></div>
+      <figcaption>Share of bus-polls five or more minutes late, by hour, one panel per route on the same scale, from the latest route overall. The band marks 15:00 to 17:59; the dot marks each route&rsquo;s worst hour. <span class="tag">[hour]</span></figcaption>
+      <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-multiples"></div></details>
+    </figure>
+  </section>
+
+  <section id="where">
+    <h2>Where the time goes</h2>
+    <p>Adding up the delay each bus gains between consecutive stops shows where the minutes go. The largest single loss is route 36 around the American Way Transit Center, about three minutes a pass at American Way and Getwell in both directions. Route 42 loses time stop after stop on Cleveland and Bellevue, and route 50 along Poplar.</p>
+    <figure>
+      <div class="marginnote" id="where-list"><span>Bus-minutes lost per day, where buses gain the most delay. <span class="tag">[where]</span></span></div>
+      <div class="legend"><span><i class="k k-dot k-late"></i>delay gained, circle area &prop; bus-minutes per day</span><span><i class="k k-line k-ink"></i>slowest stretches</span><span><svg class="k" width="10" height="10" aria-hidden="true"><rect x="1.5" y="1.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>transit centers</span></div>
+      <div class="chart" id="fig-map"></div>
+      <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-map"></div></details>
+    </figure>
+    <p>The slowest stretches, measured stop to stop over at least 300 metres, include the time spent at the far stop:</p>
+    <div class="block"><div class="scroll" id="slow-table"></div></div>
+  </section>
+
+  <section id="wait">
+    <h2>Waiting at the stop</h2>
+    <p>Put lateness and missing trips together from a rider&rsquo;s side. Arrive at a timepoint two minutes before the timetable says, and wait for the next bus of that route. The median wait is 4.9 minutes. On routes that lost trips it is far longer: 48 minutes on route 69, 25 on route 02, 15 on route 01.</p>
+    <figure>
+      <span class="marginnote">Waits at mid-route timepoints: median (dot), middle half (thick line) and 90th percentile (end of thin line), on a logarithmic scale. Red rows are routes where two waits in five or more exceed fifteen minutes. The trolley&rsquo;s row rests on only 52 timetabled calls. <span class="tag">[stop_wait]</span></span>
+      <div class="chart" id="fig-wait"></div>
+      <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-wait"></div></details>
+    </figure>
+    <p>MATA&rsquo;s countdowns are accurate close in and optimistic further out <span class="spark" id="spark-predict"></span>. Within five minutes of a prediction, 87% of buses come within two minutes of it. Twenty to forty minutes ahead, 41% do, and 42% come a minute or more earlier than predicted. A rider who times a walk to a twenty-minute countdown will often find the bus gone.</p>
+    <figure>
+      <span class="marginnote">Actual minus predicted time at the stop, by how far ahead the prediction was made: median (line), middle half (inner band) and middle 80% (outer band). Below, the share of predictions that came within two minutes. 250,024 predictions for trips with a bus on them, Friday. <span class="tag">[predict]</span></span>
+      <div class="legend"><span><i class="k k-line k-ink"></i>median</span><span><i class="k k-sq k-band2"></i>middle half</span><span><i class="k k-sq k-band"></i>middle 80%</span></div>
+      <div class="chart" id="fig-predict"></div>
+      <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-predict"></div></details>
+    </figure>
+  </section>
+
+  <section id="full">
+    <h2>How full the buses run</h2>
+    <p>The tracker reports each bus&rsquo;s load as a percentage of fifty riders, so the riders on board are that figure halved. On Thursday the network carried 4,064 rider-hours and at least 8,077 boardings <span class="spark" id="spark-riders"></span>, close to the 7,700 a day MATA reported for September 2023. The busiest moment on both days was 15:40, with 451 and 423 riders aboard.</p>
+    <figure>
+      <span class="marginnote">Riders on board every bus in service, five-minute averages. The single busiest polls, both at 15:40, had 451 riders aboard on Thursday and 423 on Friday. <span class="tag">[riders_day]</span></span>
+      <div class="legend"><span><i class="k k-line k-ran"></i>Thursday</span><span><i class="k k-line k-ink"></i>Friday, to 20:20</span></div>
+      <div class="chart" id="fig-riders"></div>
+      <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-riders"></div></details>
+    </figure>
+    <p>The fleet was short most of the day. Against the trips the timetable had in progress, the tracker usually saw about four fewer buses on the road, and as many as thirteen fewer.</p>
+    <figure>
+      <span class="marginnote">Trips in progress according to the timetable, and buses in service, every fifteen minutes. Shaded where the buses fell short. <span class="tag">[fleet]</span></span>
+      <div class="legend"><span><i class="k k-line k-ran"></i>trips in progress</span><span><i class="k k-line k-ink"></i>buses in service</span><span><i class="k k-sq" style="background:var(--late-wash)"></i>short</span></div>
+      <div class="chart" id="fig-fleet"></div>
+      <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-fleet"></div></details>
+    </figure>
+    <p>Buses are seldom crowded. Average loads run from 1 to 11 riders, and the 95th percentile tops out at 29, on route 50. Every seat of a 40-foot bus was taken on only three routes, and every reading of 96% or more was route 50 heading out to Exeter Road between 08:40 and 13:10.</p>
+    <figure>
+      <span class="marginnote">Riders on board, per bus-poll: median (dot), middle half (thick line), 95th percentile (end of thin line) and maximum (tick). A 40-foot bus seats 40, and MATA plans for at most 48. <span class="tag">[load]</span></span>
+      <div class="chart" id="fig-loads"></div>
+      <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-loads"></div></details>
+    </figure>
+    <p><span class="marginnote" id="board-list"><span>Where riders board: net riders on per day. The first stops out of the transit centers lead. <span class="tag">[boardings]</span></span></span>Within a route, fuller buses run later. On route 50, 46% of polls with twenty or more riders were five minutes late, against 16% with fewer than ten; on route 08, 58% against 26%. Boarding time may be the cause, or late buses may collect more waiting riders; the data can&rsquo;t tell which. Across routes the busiest are not especially late: the correlation is 0.19.</p>
+  </section>
+
+  <section id="routes">
+    <h2>Every route</h2>
+    <p>One row per route, both days together. Select a column heading to sort.</p>
+    <figure class="fullwidth">
+      <div class="scroll" id="route-table"></div>
+      <figcaption>Never ran: trips that never ran, of those scheduled Thursday and Friday (Friday to 19:50). On time, late and early: shares of bus-polls. Left on time: Friday departures from the first stop, from MATA&rsquo;s feed. Wait: median at mid-route timepoints. Riders: average on board, with the 95th percentile. <span class="tag">[q1] [missed] [depart] [stop_wait] [load]</span></figcaption>
+    </figure>
+  </section>
+
+  <section id="method">
+    <h2>How the numbers were checked</h2>
+    <p>The tracker gives each bus&rsquo;s position, delay, next stop and load every ten seconds, with no trip ID and no timestamp of its own. A few checks decide what that data can carry.</p>
+    <h3>The load figure counts riders</h3>
+    <p>All 351,576 load readings are even numbers, and together they cover every even value from 0 to 100. The vendor divides a rider count by 50 for every vehicle; a capacity that varied from bus to bus would produce odd percentages.</p>
+    <figure>
+      <span class="marginnote">Readings at each load percentage, on a square-root scale. Odd values never occur.</span>
+      <div class="chart" id="fig-comb"></div>
+      <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-comb"></div></details>
+    </figure>
+    <p>MATA&rsquo;s feed also reports load, as a category. Matched to the tracker&rsquo;s reading from the same report, the categories turn out to be fixed bands of that same count, and &ldquo;standing room only&rdquo; starts at about 11 riders, on a bus with 40 seats. They say nothing about free seats.</p>
+    <figure>
+      <span class="marginnote">Riders on board for each category in MATA&rsquo;s feed: middle 90% of readings (line) and median (dot), 5,915 matched reports.</span>
+      <div class="chart" id="fig-cats"></div>
+      <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-cats"></div></details>
+    </figure>
+    <h3>Speed is in metres per second</h3>
+    <p>For 2,751 moving buses reported by both feeds at the same position, the tracker&rsquo;s speed equals the official feed&rsquo;s metres-per-second value 97% of the time. Distance covered over five-minute windows agrees, at 1.03 times speed multiplied by time.</p>
+    <figure>
+      <span class="marginnote">Matched reports by tracker speed and official speed; circle area &prop; count among moving buses. Nearly every report sits on the diagonal; the red ones off it disagree.</span>
+      <div class="chart" id="fig-speed"></div>
+      <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-speed"></div></details>
+    </figure>
+    <h3>Stuck positions are mostly buses waiting</h3>
+    <p>A bus whose coordinates stop changing is either parked or carrying a tracker that has stopped reporting. How the still stretch ends tells the two apart: a parked bus drives off from the same spot, while a dead tracker reappears somewhere else. Long still stretches are layovers and holds. Dead trackers are short, and one bus, 458, accounts for nearly half of all the rows they leave behind.</p>
+    <div class="block"><div class="scroll" id="ghost-table"></div><p class="note">Still stretches of six polls or more, by how they ended. The few not counted in a column were still under way when this snapshot ended.</p></div>
+    <p>They barely matter for delay, because the vendor freezes the delay along with the position. Dropping them, instead of long still stretches, moves no route&rsquo;s late share by more than 1.4 points.</p>
+    <h3>Trips, stops and the ends of lines</h3>
+    <p>The tracker names no trip, so each bus is matched to the timetable trip due at its next stop. Checked against 60,662 reports in MATA&rsquo;s feed, the match agrees 99.8% of the times it names a trip, and it names none 2.6% of the time, mostly between trips. The log of when buses serve stops catches 84% of the stops on a trip that ran. At the end of a line the tracker still shows the finished trip&rsquo;s destination as the bus leaves, so departures there are timed from MATA&rsquo;s feed instead.</p>
+    <h3>Not yet answerable</h3>
+    <p>Weekday against weekend, weather and events need weeks of data. The effect of detours needs the poller&rsquo;s new detour log to run for weeks. The minute window MATA uses for its own on-time figures isn&rsquo;t published; this page uses the usual one, at most one minute early and five minutes late.</p>
+  </section>
+
+  <footer>Code, queries and the written findings: <a href="https://github.com/jpbranson/mata-scraper-claude">github.com/jpbranson/mata-scraper-claude</a> (<code>FINDINGS.md</code>, <code>analysis.sql</code>). Bracketed tags name the query behind each graphic. Snapshot of Friday 25 September 2026, 20:21 Central.</footer>
+</article>
+
+<div id="tip" hidden aria-hidden="true"></div>
+
+<script id="page-data" type="application/json">__DATA__</script>
+<script>
+(function () {
+"use strict";
+const D = JSON.parse(document.getElementById("page-data").textContent);
+const NS = "http://www.w3.org/2000/svg";
+const DAYS = ["2026-09-24", "2026-09-25"];
+const DAYNAME = { "2026-09-24": "Thursday", "2026-09-25": "Friday" };
+const NAME = D.route_names || {};
+
+/* ---------- small helpers ---------- */
+const rd = v => Math.round(v * 10) / 10;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const pct = v => v == null ? "–" : Math.round(v * 100) + "%";
+const toMin = s => { const [h, m] = s.split(":").map(Number); return h * 60 + m; };
+const hhmm = m => Math.floor(m / 60) + ":" + String(Math.round(m % 60)).padStart(2, "0");
+const hourLabel = h => h === 12 ? "noon" : h < 12 ? h + "am" : (h - 12) + "pm";
+const lin = (d0, d1, r0, r1) => v => r0 + (v - d0) / (d1 - d0) * (r1 - r0);
+const logs = (d0, d1, r0, r1) => { const a = Math.log(d0), b = Math.log(d1); return v => r0 + (Math.log(Math.max(v, d0)) - a) / (b - a) * (r1 - r0); };
+function nice(s) {
+  if (!s) return "";
+  s = String(s).replace(/\bat(?=[A-Z])/g, "at ").replace(/\/(OB|IB)\b/g, "").replace(/\s+TRLLY\b/, "")
+    .replace(/\s*@\s*/g, " @ ").replace(/\s+/g, " ").trim().toLowerCase()
+    .replace(/(^|[\s\-&/(])([a-z])/g, (m, p, c) => p + c.toUpperCase());
+  return s.replace(/\bAt\b/g, "at").replace(/\bTr$/, "Transit Center").replace(/\bIrs\b/g, "IRS")
+    .replace(/\bAw Willis\b/g, "A.W. Willis").replace(/\bMc([a-z])/g, (m, c) => "Mc" + c.toUpperCase());
+}
+const MINUS = "−";
+const sgn = (v, d, plus) => (v < 0 ? MINUS : plus && v > 0 ? "+" : "") + Math.abs(v).toFixed(d == null ? 0 : d);
+const routeName = r => nice(NAME[r] || "");
+function mk(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  if (attrs) for (const k in attrs) if (attrs[k] !== undefined && attrs[k] !== null) e.setAttribute(k, typeof attrs[k] === "number" ? rd(attrs[k]) : attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function tx(parent, x, y, s, cls, anchor) {
+  const t = mk("text", { x, y, class: cls || null, "text-anchor": anchor || null }, parent);
+  t.textContent = s;
+  return t;
+}
+function svgIn(host, w, h, label) {
+  host.textContent = "";
+  return mk("svg", { width: w, height: h, viewBox: `0 0 ${w} ${h}`, role: "img", "aria-label": label }, host);
+}
+const linePath = pts => pts.map((p, i) => (i ? "L" : "M") + rd(p[0]) + " " + rd(p[1])).join("");
+function areaPath(top, bottom) {
+  return linePath(top) + bottom.slice().reverse().map(p => "L" + rd(p[0]) + " " + rd(p[1])).join("") + "Z";
+}
+function colPath(x, y0, w, y1, r) {
+  const h = y0 - y1; r = Math.max(0, Math.min(r, w / 2, h));
+  return `M${rd(x)} ${rd(y0)}V${rd(y1 + r)}Q${rd(x)} ${rd(y1)} ${rd(x + r)} ${rd(y1)}H${rd(x + w - r)}Q${rd(x + w)} ${rd(y1)} ${rd(x + w)} ${rd(y1 + r)}V${rd(y0)}Z`;
+}
+function hline(g, x0, x1, y, cls) { return mk("line", { x1: x0, x2: x1, y1: Math.round(y) + .5, y2: Math.round(y) + .5, class: cls }, g); }
+function vline(g, x, y0, y1, cls) { return mk("line", { x1: Math.round(x) + .5, x2: Math.round(x) + .5, y1: y0, y2: y1, class: cls }, g); }
+function niceStep(span, n) {
+  const raw = span / n, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
+}
+
+/* ---------- tooltip ---------- */
+const tipEl = document.getElementById("tip");
+function showTip(evt, anchorEl, title, rows) {
+  tipEl.textContent = "";
+  if (title) { const h = document.createElement("div"); h.className = "tip-h"; h.textContent = title; tipEl.appendChild(h); }
+  for (const r of rows) {
+    const row = document.createElement("div"); row.className = "tip-r";
+    if (r.key) { const k = document.createElement("span"); k.className = "tip-k"; k.style.background = `var(--${r.key})`; row.appendChild(k); }
+    const v = document.createElement("strong"); v.textContent = r.v; row.appendChild(v);
+    if (r.l) { const l = document.createElement("span"); l.className = "tip-l"; l.textContent = " " + r.l; row.appendChild(l); }
+    tipEl.appendChild(row);
+  }
+  tipEl.hidden = false;
+  let x, y;
+  if (evt && evt.clientX != null && evt.type !== "focus") { x = evt.clientX; y = evt.clientY; }
+  else { const b = anchorEl.getBoundingClientRect(); x = b.left + Math.min(b.width / 2, 60); y = b.top; }
+  const w = tipEl.offsetWidth, h = tipEl.offsetHeight, vw = document.documentElement.clientWidth;
+  let left = x + 14, top = y - h - 12;
+  if (left + w > vw - 8) left = x - w - 14;
+  if (left < 8) left = 8;
+  if (top < 8) top = y + 20;
+  tipEl.style.left = left + "px";
+  tipEl.style.top = top + "px";
+}
+function hideTip() { tipEl.hidden = true; }
+function hover(el, fn, after) {
+  const on = e => { const r = fn(e); if (r) showTip(e, el, r[0], r[1]); else hideTip(); };
+  el.addEventListener("pointermove", on);
+  el.addEventListener("pointerdown", on);
+  el.addEventListener("focus", on);
+  el.addEventListener("pointerleave", e => { if (e.pointerType !== "touch") { hideTip(); if (after) after(); } });
+  el.addEventListener("blur", () => { hideTip(); if (after) after(); });
+}
+document.addEventListener("pointerdown", e => { if (!(e.target.closest && e.target.closest(".hit, .hit-line"))) hideTip(); }, true);
+window.addEventListener("scroll", hideTip, { passive: true });
+
+/* ---------- table views ---------- */
+function table(id, head, rows) {
+  const host = document.getElementById(id);
+  if (!host) return;
+  host.textContent = "";
+  const t = document.createElement("table");
+  const tr = t.createTHead().insertRow();
+  for (const h of head) { const th = document.createElement("th"); th.textContent = h; tr.appendChild(th); }
+  const tb = t.createTBody();
+  for (const r of rows) { const row = tb.insertRow(); for (const c of r) row.insertCell().textContent = c == null ? "–" : c; }
+  host.appendChild(t);
+}
+
+/* ---------- rendering on load and resize ---------- */
+const renders = [];
+function add(id, fn) {
+  const host = document.getElementById(id);
+  if (!host) return;
+  const r = { host, fn, w: 0 };
+  renders.push(r);
+  draw(r);
+}
+function draw(r) {
+  const w = Math.floor(r.host.clientWidth);
+  if (w === r.w || w < 40) return;
+  r.w = w;
+  try { r.fn(r.host, w); } catch (err) { console.error(err); r.host.textContent = "This graphic could not be drawn."; }
+}
+let rt;
+window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => renders.forEach(draw), 150); });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => renders.forEach(r => { r.w = 0; draw(r); }));
+
+/* ---------- sparklines ---------- */
+function spark(id, pts, opt) {
+  const host = document.getElementById(id);
+  if (!host || !pts.length) return;
+  const w = opt.w || 68, h = 15, xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const x = lin(Math.min(...xs), Math.max(...xs), 2, w - 2);
+  const y = lin(opt.y0 == null ? 0 : opt.y0, Math.max(...ys), h - 2, 2);
+  const s = mk("svg", { width: w, height: h, viewBox: `0 0 ${w} ${h}`, class: "spark", "aria-hidden": "true" });
+  host.replaceWith(s);
+  mk("path", { d: linePath(pts.map(p => [x(p[0]), y(p[1])])), class: "l-ink2", style: "stroke-width:1.2" }, s);
+  for (const i of opt.dots) mk("circle", { cx: x(pts[i][0]), cy: y(pts[i][1]), r: 2, class: opt.dotCls || "f-late" }, s);
+}
+{
+  const mh = D.missed_hour.filter(r => r[0] <= 19).map(r => [r[0], r[2] / r[1]]);
+  const mi = mh.reduce((b, p, i) => p[1] > mh[b][1] ? i : b, 0);
+  spark("spark-missed", mh, { dots: [mi] });
+  const lh = D.hour.map(r => [r.h, r.late]);
+  spark("spark-late", lh, { dots: [lh.reduce((b, p, i) => p[1] > lh[b][1] ? i : b, 0)] });
+  const pr = D.predict.map(r => [r.lead, r.within2]);
+  spark("spark-predict", pr, { dots: [0, pr.length - 1], dotCls: "f-ink2" });
+  const rc = D.riders_curve["2026-09-24"].map(r => [r[0], r[1]]);
+  spark("spark-riders", rc, { w: 76, dots: [rc.reduce((b, p, i) => p[1] > rc[b][1] ? i : b, 0)], dotCls: "f-ink" });
+}
+
+/* ---------- missed trips: the timetable barcode ---------- */
+add("fig-barcode", (host, W) => {
+  const by = {}, routes = [];
+  for (const [day, r, m, ran, canc, head] of D.barcode) {
+    (by[r + "|" + day] || (by[r + "|" + day] = [])).push({ m, ran, canc, head });
+    if (!routes.includes(r)) routes.push(r);
+  }
+  const share = r => { let n = 0, k = 0; for (const d of DAYS) for (const t of by[r + "|" + d] || []) { n++; if (!t.ran) k++; } return n ? k / n : 0; };
+  routes.sort((a, b) => share(b) - share(a) || +a - +b);
+  const side = W >= 700, gap = 30, pw = side ? (W - gap) / 2 : W;
+  const rowH = 14, top = 30, labW = 28, cntW = 50, ph = top + routes.length * rowH + 22;
+  const H = side ? ph : ph * 2 + 18;
+  const s = svgIn(host, W, H, "Scheduled trips by route and departure time, Thursday and Friday; red ticks are trips that never ran");
+  const cutoff = toMin(D.missed_days[1].due_by);
+  DAYS.forEach((day, di) => {
+    const ox = side ? di * (pw + gap) : 0;
+    const g = mk("g", { transform: `translate(${ox},${side ? 0 : di * (ph + 18)})` }, s);
+    const x0 = labW, x1 = pw - cntW, x = lin(240, 1380, x0, x1), yb = top + routes.length * rowH;
+    tx(g, x0, 14, DAYNAME[day], "t-ink t-it t-lg");
+    tx(g, pw, 14, "never ran", "t-sm t-it", "end");
+    for (const h of [6, 9, 12, 15, 18, 21]) { vline(g, x(h * 60), top - 4, yb, "grid"); tx(g, x(h * 60), yb + 15, hourLabel(h), "", "middle"); }
+    if (di === 1 && cutoff < 1380) {
+      mk("rect", { x: x(cutoff), y: top - 4, width: x1 - x(cutoff), height: yb - top + 4, class: "unknown" }, g);
+      tx(g, x1, top - 8, "not yet counted", "t-sm t-it", "end");
+    }
+    routes.forEach((r, ri) => {
+      const y = top + ri * rowH, trips = by[r + "|" + day] || [];
+      tx(g, labW - 6, y + rowH - 3.5, r, "t-ink2", "end");
+      for (const t of trips) if (t.ran) mk("line", { x1: x(t.m), x2: x(t.m), y1: y + 3, y2: y + rowH - 2, class: "tk-ran" }, g);
+      let k = 0;
+      for (const t of trips) if (!t.ran) {
+        k++;
+        mk("line", { x1: x(t.m), x2: x(t.m), y1: y + 1.5, y2: y + rowH - .5, class: "tk-miss" }, g);
+        if (t.canc) mk("circle", { cx: x(t.m), cy: y + 1.5, r: 2.2, class: "f-late ring", style: "stroke-width:1" }, g);
+      }
+      tx(g, pw, y + rowH - 3.5, trips.length ? k + "/" + trips.length : "", k ? "t-ink" : "", "end");
+      const hit = mk("rect", { x: 0, y, width: pw, height: rowH, class: "hit clear", tabindex: 0, "aria-label": `Route ${r}, ${DAYNAME[day]}: ${k} of ${trips.length} trips never ran` }, g);
+      hover(hit, e => {
+        const title = `Route ${r} ${routeName(r)} · ${DAYNAME[day]}`;
+        const sum = { v: `${k} of ${trips.length}`, l: "trips never ran this day" };
+        if (!e || e.clientX == null || e.type === "focus") return [title, [sum]];
+        const px = e.clientX - s.getBoundingClientRect().left - ox;
+        let best = null, bd = 1e9;
+        for (const t of trips) { const d = Math.abs(x(t.m) - px); if (d < bd) { bd = d; best = t; } }
+        if (!best || bd > 12) return [title, [sum]];
+        return [title, [
+          { v: hhmm(best.m), l: "due to leave, to " + nice(best.head) },
+          best.ran ? { v: "ran", key: "ran" } : { v: "never ran", l: best.canc ? "marked canceled in MATA’s feed" : "not marked canceled", key: "late" },
+          sum]];
+      });
+    });
+  });
+  table("tv-barcode", ["Route", "Name", "Thu scheduled", "Thu never ran", "Fri scheduled", "Fri never ran", "Fri marked canceled"],
+    routes.map(r => {
+      const a = by[r + "|" + DAYS[0]] || [], b = by[r + "|" + DAYS[1]] || [];
+      return [r, routeName(r), a.length, a.filter(t => !t.ran).length, b.length, b.filter(t => !t.ran).length, b.filter(t => !t.ran && t.canc).length];
+    }));
+});
+
+/* ---------- departures from the first stop ---------- */
+add("fig-depart", (host, W) => {
+  const vals = D.depart.map(d => d[1]), lo = -5, hi = 20, bins = [];
+  for (let k = lo; k <= hi; k++) bins.push({ k, n: 0 });
+  for (const v of vals) bins[clamp(Math.floor(v), lo, hi) - lo].n++;
+  const H = 240, m = { l: 34, r: 8, t: 34, b: 38 };
+  const s = svgIn(host, W, H, "Histogram of departure delay from the first stop, Friday");
+  const x = lin(lo, hi + 1, m.l, W - m.r), bw = x(1) - x(0), barW = Math.min(24, Math.max(2, bw - 2));
+  const maxN = Math.max(...bins.map(b => b.n)), step = niceStep(maxN, 3), yMax = Math.ceil(maxN / step) * step;
+  const y = lin(0, yMax, H - m.b, m.t);
+  for (let t = step; t <= yMax; t += step) { hline(s, m.l, W - m.r, y(t), "grid"); tx(s, m.l - 6, y(t) + 4, t, "", "end"); }
+  const med = D.depart_all.median;
+  vline(s, x(med), m.t - 2, H - m.b, "l-thin");
+  tx(s, x(med) + 5, m.t + 10, `median ${med.toFixed(1)} min`, "t-sm t-it t-ink2");
+  for (const b of bins) {
+    const cls = b.k < -1 ? "f-early" : b.k >= 5 ? "f-late" : "f-ontime";
+    if (b.n) mk("path", { d: colPath(x(b.k) + (bw - barW) / 2, y(0), barW, y(b.n), 3), class: cls }, s);
+    const hit = mk("rect", { x: x(b.k), y: m.t, width: bw, height: H - m.b - m.t, class: "hit", tabindex: 0, "aria-label": `${b.n} departures` }, s);
+    const lab = b.k >= hi ? `${hi} or more minutes late` : b.k < 0 ? `${-b.k - 1}–${-b.k} min early` : `${b.k}–${b.k + 1} min late`;
+    hover(hit, () => [lab, [{ v: String(b.n), l: `departures (${pct(b.n / vals.length)})` }]]);
+  }
+  hline(s, m.l, W - m.r, y(0), "base");
+  const wx0 = x(-1), wx1 = x(5);
+  mk("path", { d: `M${rd(wx0)} ${m.t - 6}V${m.t - 12}H${rd(wx1)}V${m.t - 6}`, class: "l-thin" }, s);
+  tx(s, (wx0 + wx1) / 2, m.t - 16, "on time", "t-it t-ink2", "middle");
+  for (const t of [-5, 0, 5, 10, 15, 20]) tx(s, x(t) + (t === 20 ? bw / 2 : 0), H - m.b + 16, t === 20 ? "20+" : sgn(t), "", "middle");
+  tx(s, W - m.r, H - 4, "minutes after the scheduled departure", "t-sm t-it", "end");
+  table("tv-depart", ["Minutes after scheduled departure", "Departures"], bins.map(b => [b.k >= hi ? "20 or more" : `${b.k} to ${b.k + 1}`, b.n]));
+});
+
+/* ---------- start and end of each trip ---------- */
+add("fig-startend", (host, W) => {
+  const rows = D.start_end.filter(r => r.trips >= 10).slice().sort((a, b) => b.gain - a.gain);
+  const rowH = 19, m = { l: 30, r: 40, t: 26, b: 34 }, H = m.t + rows.length * rowH + m.b;
+  const s = svgIn(host, W, H, "Mean delay at the first and last stop logged on each trip, by route");
+  const x = lin(-4, 10, m.l, W - m.r);
+  for (let t = -4; t <= 10; t += 2) { vline(s, x(t), m.t - 4, H - m.b + 2, t === 0 ? "base" : "grid"); tx(s, x(t), H - m.b + 16, sgn(t, 0, true), "", "middle"); }
+  tx(s, x(0), m.t - 9, "on time", "t-sm t-it t-ink2", "middle");
+  tx(s, W - m.r, H - 4, "mean minutes late (negative: early)", "t-sm t-it", "end");
+  rows.forEach((r, i) => {
+    const y = m.t + i * rowH + rowH / 2, c = r.gain > .5 ? "late" : r.gain < -.5 ? "early" : "ink2";
+    tx(s, m.l - 8, y + 4, r.route, "t-ink2", "end");
+    mk("line", { x1: x(r.start), x2: x(r.end), y1: y, y2: y, class: "l-" + c + " hair", style: "stroke-width:1.5" }, s);
+    mk("circle", { cx: x(r.start), cy: y, r: 3.5, class: "o-" + c }, s);
+    mk("circle", { cx: x(r.end), cy: y, r: 4, class: "f-" + c + " ring" }, s);
+    tx(s, W - 2, y + 4, sgn(r.gain, 1, true), r.gain > .5 ? "t-ink" : "", "end");
+    const hit = mk("rect", { x: 0, y: y - rowH / 2, width: W, height: rowH, class: "hit", tabindex: 0, "aria-label": `Route ${r.route}` }, s);
+    hover(hit, () => [`Route ${r.route} ${routeName(r.route)}`, [
+      { v: `${r.start.toFixed(1)} min late`, l: "at the first stop logged" },
+      { v: `${Math.abs(r.end).toFixed(1)} min ${r.end < 0 ? "early" : "late"}`, l: "at the last" },
+      { v: sgn(r.gain, 1, true) + " min", l: `change, over ${r.trips} trips` }]]);
+  });
+  table("tv-startend", ["Route", "Trips", "Mean delay at first stop (min)", "Mean delay at last stop (min)", "Change (min)"],
+    rows.map(r => [r.route, r.trips, r.start.toFixed(1), r.end.toFixed(1), r.gain.toFixed(1)]));
+});
+
+/* ---------- direction slopegraph ---------- */
+add("fig-direction", (host, W) => {
+  const rows = D.direction.filter(d => d.in != null && d.out != null && d.route !== "100");
+  const H = 340, m = { t: 44, b: 14 }, side = Math.min(150, Math.max(92, W * .28));
+  const lx = side, rx = W - side, y = lin(0, .6, H - m.b, m.t);
+  const s = svgIn(host, W, H, "Slopegraph of late share toward and away from downtown, by route");
+  tx(s, lx + 10, 14, "to downtown", "t-it t-ink2", "end");
+  tx(s, rx - 10, 14, "from downtown", "t-it t-ink2", "start");
+  tx(s, (lx + rx) / 2, 30, "share of bus-polls 5+ min late", "t-sm t-it", "middle");
+  vline(s, lx, y(.6), y(0), "grid");
+  vline(s, rx, y(.6), y(0), "grid");
+  const pts = d => Math.round((d.out - d.in) * 1000) / 10;
+  const cls = d => pts(d) >= 10 ? "late" : pts(d) < 0 ? "early" : "ran";
+  const order = rows.slice().sort((a, b) => ({ ran: 0, early: 1, late: 2 })[cls(a)] - ({ ran: 0, early: 1, late: 2 })[cls(b)]);
+  for (const d of order) {
+    const c = cls(d);
+    mk("line", { x1: lx, x2: rx, y1: y(d.in), y2: y(d.out), class: "l-" + c, style: c === "ran" ? "stroke-width:1.2" : "stroke-width:1.6" }, s);
+    mk("circle", { cx: lx, cy: y(d.in), r: 2.6, class: "f-" + c }, s);
+    mk("circle", { cx: rx, cy: y(d.out), r: 2.6, class: "f-" + c }, s);
+    const hl = mk("line", { x1: lx, x2: rx, y1: y(d.in), y2: y(d.out), class: "hit-line", tabindex: 0, "aria-label": `Route ${d.route}` }, s);
+    hover(hl, () => [`Route ${d.route} ${routeName(d.route)}`, [
+      { v: pct(d.out), l: "late leaving downtown", key: c === "ran" ? "ran" : c },
+      { v: pct(d.in), l: "late heading downtown" }]]);
+  }
+  function place(items, lo, hi, gapPx) {
+    items.sort((a, b) => a.y - b.y);
+    items.forEach(it => { it.ly = it.y; });
+    for (let i = 1; i < items.length; i++) if (items[i].ly - items[i - 1].ly < gapPx) items[i].ly = items[i - 1].ly + gapPx;
+    if (items.length && items[items.length - 1].ly > hi) {
+      items[items.length - 1].ly = hi;
+      for (let i = items.length - 2; i >= 0; i--) if (items[i + 1].ly - items[i].ly < gapPx) items[i].ly = items[i + 1].ly - gapPx;
+    }
+    if (items.length && items[0].ly < lo) { const sh = lo - items[0].ly; items.forEach(it => { it.ly += sh; }); }
+    return items;
+  }
+  const L = place(rows.map(d => ({ d, y: y(d.in) })), m.t, H - m.b, 13.5);
+  const R = place(rows.map(d => ({ d, y: y(d.out) })), m.t, H - m.b, 13.5);
+  for (const it of L) {
+    if (Math.abs(it.ly - it.y) > 1.5) mk("path", { d: `M${lx - 4} ${rd(it.y)}L${lx - 12} ${rd(it.ly)}`, class: "l-thin", style: "stroke:var(--rule)" }, s);
+    tx(s, lx - 14, it.ly + 4, `${pct(it.d.in)} ${it.d.route}`, cls(it.d) === "ran" ? "" : "t-ink2", "end");
+  }
+  for (const it of R) {
+    if (Math.abs(it.ly - it.y) > 1.5) mk("path", { d: `M${rx + 4} ${rd(it.y)}L${rx + 12} ${rd(it.ly)}`, class: "l-thin", style: "stroke:var(--rule)" }, s);
+    tx(s, rx + 14, it.ly + 4, `${it.d.route} ${pct(it.d.out)}`, cls(it.d) === "ran" ? "" : "t-ink2", "start");
+  }
+  table("tv-direction", ["Route", "Late heading downtown", "Late leaving downtown", "Polls toward", "Polls away"],
+    rows.map(d => [d.route, pct(d.in), pct(d.out), d.in_polls, d.out_polls]));
+});
+
+/* ---------- lateness by hour ---------- */
+function hourAxis(g, x, y0, labelY, hours, from, to) {
+  for (const h of hours) { vline(g, x(h), y0, labelY - 12, "grid"); tx(g, x(h), labelY, hourLabel(h), "", "middle"); }
+}
+add("fig-hour", (host, W) => {
+  const rows = D.hour, H = 250, m = { l: 36, r: 10, t: 18, b: 30 };
+  const s = svgIn(host, W, H, "Share of bus-polls late and early by hour of day");
+  const x = lin(4, 23, m.l, W - m.r), y = lin(0, .45, H - m.b, m.t);
+  mk("rect", { x: x(15), y: m.t, width: x(18) - x(15), height: H - m.b - m.t, class: "band" }, s);
+  for (const t of [.1, .2, .3, .4]) { hline(s, m.l, W - m.r, y(t), "grid"); tx(s, m.l - 6, y(t) + 4, pct(t), "", "end"); }
+  hline(s, m.l, W - m.r, y(0), "base");
+  tx(s, m.l - 6, y(0) + 4, "0", "", "end");
+  for (const h of [6, 9, 12, 15, 18, 21]) tx(s, x(h), H - m.b + 16, hourLabel(h), "", "middle");
+  const L = rows.map(r => [x(r.h + .5), y(r.late)]), E = rows.map(r => [x(r.h + .5), y(r.early)]);
+  mk("path", { d: linePath(E), class: "l-early" }, s);
+  mk("path", { d: linePath(L), class: "l-late" }, s);
+  const li = rows.reduce((b, r, i) => r.late > rows[b].late ? i : b, 0), ei = rows.length - 1;
+  mk("circle", { cx: L[li][0], cy: L[li][1], r: 4, class: "f-late ring" }, s);
+  tx(s, L[li][0], L[li][1] - 10, `${pct(rows[li].late)} at ${hourLabel(rows[li].h)}`, "t-ink2", "middle");
+  mk("circle", { cx: E[ei][0], cy: E[ei][1], r: 4, class: "f-early ring" }, s);
+  tx(s, E[ei][0] - 8, E[ei][1] - 8, `${pct(rows[ei].early)} early at 10pm`, "t-ink2", "end");
+  const xh = vline(s, -10, m.t, H - m.b, "xhair");
+  xh.style.display = "none";
+  const hit = mk("rect", { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.b - m.t, class: "hit clear", tabindex: 0, "aria-label": "Lateness by hour" }, s);
+  hover(hit, e => {
+    let r = rows[li];
+    if (e && e.clientX != null && e.type !== "focus") {
+      const px = e.clientX - s.getBoundingClientRect().left;
+      r = rows[clamp(Math.floor(4 + (px - m.l) / (W - m.l - m.r) * 19) - 4, 0, rows.length - 1)];
+    }
+    xh.style.display = "";
+    xh.setAttribute("x1", Math.round(x(r.h + .5)) + .5);
+    xh.setAttribute("x2", Math.round(x(r.h + .5)) + .5);
+    return [`${r.h}:00–${r.h}:59`, [{ v: pct(r.late), l: "5+ min late", key: "late" }, { v: pct(r.early), l: "2+ min early", key: "early" }, { v: r.polls.toLocaleString("en-US"), l: "bus-polls" }]];
+  }, () => { xh.style.display = "none"; });
+  table("tv-hour", ["Hour", "5+ min late", "2+ min early", "Bus-polls"], rows.map(r => [`${r.h}:00`, pct(r.late), pct(r.early), r.polls]));
+});
+
+/* ---------- small multiples by route ---------- */
+add("fig-multiples", (host, W) => {
+  const order = D.q1.map(q => q.route), late = Object.fromEntries(D.q1.map(q => [q.route, q.late]));
+  const cols = W >= 880 ? 5 : W >= 560 ? 4 : 3, gx = 16, gy = 14, cw = (W - gx * (cols - 1)) / cols, ch = 84;
+  const rowsN = Math.ceil(order.length / cols), H = rowsN * ch + (rowsN - 1) * gy + 18;
+  const s = svgIn(host, W, H, "Small multiples: share of bus-polls late by hour, one panel per route");
+  order.forEach((r, i) => {
+    const ox = (i % cols) * (cw + gx), oy = Math.floor(i / cols) * (ch + gy);
+    const g = mk("g", { transform: `translate(${ox},${oy})` }, s);
+    const pts = D.hour_route[r] || [], x = lin(4, 23, 0, cw), y = lin(0, 1, ch - 8, 22);
+    const t = tx(g, 0, 13, r, "t-ink2"), words = routeName(r).split(" ");
+    for (let k = words.length; k > 0; k--) {
+      t.textContent = r + " " + words.slice(0, k).join(" ").replace(/\s*&$/, "");
+      if (t.getComputedTextLength() <= cw - 40) break;
+      t.textContent = r;
+    }
+    tx(g, cw, 13, pct(late[r]), "t-ink", "end");
+    mk("rect", { x: x(15), y: 22, width: x(18) - x(15), height: ch - 30, class: "band" }, g);
+    hline(g, 0, cw, y(0), "grid");
+    hline(g, 0, cw, y(.5), "grid").style.opacity = ".6";
+    if (i === order.length - 1) tx(g, cw, y(.5) - 3, "50%", "t-sm", "end");
+    if (pts.length) {
+      mk("path", { d: linePath(pts.map(p => [x(p[0] + .5), y(p[2])])), class: "l-ink", style: "stroke-width:1.3" }, g);
+      const mi = pts.reduce((b, p, j) => p[2] > pts[b][2] ? j : b, 0);
+      mk("circle", { cx: x(pts[mi][0] + .5), cy: y(pts[mi][2]), r: 2.5, class: "f-late" }, g);
+    }
+    const hit = mk("rect", { x: 0, y: 0, width: cw, height: ch, class: "hit clear", tabindex: 0, "aria-label": `Route ${r}` }, g);
+    hover(hit, e => {
+      const title = `Route ${r} ${routeName(r)}`;
+      if (!pts.length) return [title, [{ v: pct(late[r]), l: "5+ min late overall" }]];
+      let p = pts.reduce((b, q) => q[2] > b[2] ? q : b, pts[0]);
+      if (e && e.clientX != null && e.type !== "focus") {
+        const px = e.clientX - s.getBoundingClientRect().left - ox, hh = 4 + px / cw * 19;
+        p = pts.reduce((b, q) => Math.abs(q[0] + .5 - hh) < Math.abs(b[0] + .5 - hh) ? q : b, pts[0]);
+      }
+      return [title, [{ v: pct(p[2]), l: `5+ min late, ${p[0]}:00–${p[0]}:59`, key: "late" }, { v: pct(late[r]), l: "all day" }, { v: String(p[1]), l: "bus-polls that hour" }]];
+    });
+  });
+  const hours = []; for (let h = 4; h <= 22; h++) hours.push(h);
+  table("tv-multiples", ["Route"].concat(hours.map(h => h + ":00")), order.map(r => {
+    const m = Object.fromEntries((D.hour_route[r] || []).map(p => [p[0], p[2]]));
+    return [r].concat(hours.map(h => m[h] == null ? null : pct(m[h])));
+  }));
+});
+
+/* ---------- map ---------- */
+add("fig-map", (host, W) => {
+  const [LAT0, LON0, KX, KY] = D.map_origin;
+  const P = (lat, lon) => [(lon - LON0) * KX, (lat - LAT0) * KY];
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const ln of D.network) for (let i = 0; i < ln.length; i += 2) { x0 = Math.min(x0, ln[i]); x1 = Math.max(x1, ln[i]); y0 = Math.min(y0, ln[i + 1]); y1 = Math.max(y1, ln[i + 1]); }
+  const pad = 12, k = (W - 2 * pad) / (x1 - x0), H = Math.round((y1 - y0) * k + 2 * pad + 18);
+  const X = v => pad + (v - x0) * k, Y = v => pad + (y1 - v) * k;
+  const s = svgIn(host, W, H, "Map of the MATA network with the places where buses gain the most delay");
+  let d = "";
+  for (const ln of D.network) { for (let i = 0; i < ln.length; i += 2) d += (i ? "L" : "M") + rd(X(ln[i])) + " " + rd(Y(ln[i + 1])); }
+  mk("path", { d, class: "net" }, s);
+  const hubs = [["William Hudson TC", 35.15655, -90.0477, "downtown"], ["American Way TC", 35.07598, -89.93267, ""], ["Airways TC", 35.06178, -89.99283, ""]];
+  for (const [n, la, lo] of hubs) { const [hx, hy] = P(la, lo); mk("rect", { x: X(hx) - 4, y: Y(hy) - 4, width: 8, height: 8, class: "hub" }, s); }
+  for (const sg of D.slow.slice(0, 10)) {
+    const a = P(sg.a[0], sg.a[1]), b = P(sg.b[0], sg.b[1]);
+    mk("line", { x1: X(a[0]), y1: Y(a[1]), x2: X(b[0]), y2: Y(b[1]), class: "seg" }, s);
+    const hl = mk("line", { x1: X(a[0]), y1: Y(a[1]), x2: X(b[0]), y2: Y(b[1]), class: "hit-line", tabindex: 0, "aria-label": `Slow stretch on route ${sg.route}` }, s);
+    hover(hl, () => [`Route ${sg.route}: ${nice(sg.from)} to ${nice(sg.to)}`, [{ v: sg.mph.toFixed(1) + " mph", l: "stop to stop" }, { v: `${sg.m} m`, l: `in ${(sg.secs / 60).toFixed(1)} min, ${sg.passes} passes` }]]);
+  }
+  const R = pd => 2.5 + Math.sqrt(Math.max(pd, 0)) * (W < 500 ? 1.0 : 1.3);
+  const pts = D.where.map(w => { const p = P(w.lat, w.lon); return Object.assign({ cx: X(p[0]), cy: Y(p[1]), r: R(w.per_day) }, w); });
+  for (const w of pts.slice().sort((a, b) => a.per_day - b.per_day)) {
+    mk("circle", { cx: w.cx, cy: w.cy, r: w.r, class: "f-late ring", style: "fill-opacity:.82;stroke-width:1.5" }, s);
+    const hc = mk("circle", { cx: w.cx, cy: w.cy, r: Math.max(w.r, 10), class: "hit clear", tabindex: 0, "aria-label": `${nice(w.stop)}, route ${w.route}` }, s);
+    hover(hc, () => [`Route ${w.route} to ${nice(w.head)}`, [
+      { v: "+" + w.gain.toFixed(1) + " min", l: "gained per pass, arriving at " + nice(w.stop), key: "late" },
+      { v: w.per_day + " bus-min", l: "lost per day" }, { v: String(w.passes), l: "passes" }]]);
+  }
+  // Direct labels, placed greedily where they touch no circle and no other label.
+  const boxes = pts.map(w => ({ x0: w.cx - w.r, y0: w.cy - w.r, x1: w.cx + w.r, y1: w.cy + w.r }));
+  for (const [, la, lo] of hubs) { const [hx, hy] = P(la, lo); boxes.push({ x0: X(hx) - 5, y0: Y(hy) - 5, x1: X(hx) + 5, y1: Y(hy) + 5 }); }
+  const clash = b => boxes.some(p => !(b.x1 < p.x0 || b.x0 > p.x1 || b.y1 < p.y0 || b.y0 > p.y1));
+  const DIRS = [[1, -1], [-1, -1], [1, 1], [-1, 1], [1, 0], [-1, 0], [0, -1], [0, 1]];
+  function place(cx, cy, r, text, cls, dirs) {
+    const t = tx(s, 0, 0, text, cls + " halo"), tw = t.getComputedTextLength(), th = 10;
+    for (const gap of [12, 34]) for (const [dx, dy] of dirs) {
+      const k = dx && dy ? .72 : 1, ax = cx + dx * (r + gap) * k, ay = cy + dy * (r + gap) * k;
+      const x0 = dx < 0 ? ax - tw : dx > 0 ? ax : ax - tw / 2, yb = dy < 0 ? ay : dy > 0 ? ay + th : ay + th / 2 - 1;
+      const b = { x0: x0 - 3, y0: yb - th - 2, x1: x0 + tw + 3, y1: yb + 3 };
+      if (b.x0 < 0 || b.x1 > W || b.y0 < 0 || b.y1 > H - 22 || clash(b)) continue;
+      t.setAttribute("x", rd(x0)); t.setAttribute("y", rd(yb));
+      boxes.push(b);
+      mk("line", { x1: cx + dx * r * k, y1: cy + dy * r * k, x2: ax - dx * 2, y2: ay - dy * 2, class: "l-thin" }, s);
+      return;
+    }
+    t.remove();
+  }
+  { const [hx, hy] = P(35.15655, -90.0477); place(X(hx), Y(hy), 4, "Downtown", "t-it t-sm t-ink2", [[-1, -1], [0, -1], [-1, 0], [1, -1]]); }
+  const notes = [
+    [w => w.route === "36" && /GETWELL/.test(w.stop), "36 at American Way & Getwell"],
+    [w => w.route === "42", "42 on Cleveland & Bellevue"],
+    [w => w.route === "50", "50 on Poplar"],
+    [w => w.route === "01", "01 on Tillman"],
+    [w => w.route === "100", "Trolley on Main"]];
+  for (const [f, label] of W < 520 ? notes.slice(0, 3) : notes) {
+    const ms = pts.filter(f);
+    if (!ms.length) continue;
+    const a = ms.reduce((b, w) => w.per_day > b.per_day ? w : b, ms[0]);
+    place(a.cx, a.cy, a.r, label, "t-ink t-it t-sm", DIRS);
+  }
+  const km5 = 5000 * k, sy = H - 8;
+  mk("path", { d: `M${pad} ${sy - 4}V${sy}H${rd(pad + km5)}V${sy - 4}`, class: "l-thin" }, s);
+  tx(s, pad + km5 + 6, sy, "5 km", "t-sm");
+  const list = document.getElementById("where-list");
+  if (list && !list.querySelector("ol")) {
+    const ol = document.createElement("ol"); ol.className = "rank";
+    const top = D.where.slice(0, 8), mx = top[0].per_day;
+    for (const w of top) {
+      const li = document.createElement("li");
+      const a = document.createElement("span"); a.textContent = `${w.route} · ${nice(w.stop)}`;
+      const v = document.createElement("span"); v.className = "rv"; v.textContent = Math.round(w.per_day);
+      const b = document.createElement("span"); b.className = "rb"; b.style.width = (w.per_day / mx * 100) + "%";
+      li.append(a, v, b); ol.appendChild(li);
+    }
+    list.appendChild(ol);
+  }
+  table("tv-map", ["Route", "Stop", "Direction", "Passes", "Gained per pass (min)", "Bus-minutes per day"],
+    D.where.map(w => [w.route, nice(w.stop), nice(w.head), w.passes, w.gain.toFixed(2), w.per_day]));
+});
+
+/* ---------- slowest stretches (table-graphic) ---------- */
+(function slowTable() {
+  const host = document.getElementById("slow-table");
+  if (!host) return;
+  const t = document.createElement("table"); t.className = "rt";
+  const hr = t.createTHead().insertRow();
+  for (const h of ["Route", "Stretch", "Speed", "Length and time"]) { const th = document.createElement("th"); th.textContent = h; if (h === "Stretch") th.style.textAlign = "left"; hr.appendChild(th); }
+  const tb = t.createTBody();
+  for (const sg of D.slow.slice(0, 10)) {
+    const r = tb.insertRow();
+    const c0 = r.insertCell(); const n = document.createElement("span"); n.className = "rn"; n.textContent = sg.route; c0.appendChild(n);
+    const c1 = r.insertCell(); c1.textContent = `${nice(sg.from)} → ${nice(sg.to)}`; c1.style.textAlign = "left"; c1.style.whiteSpace = "normal";
+    const c2 = r.insertCell(); const cb = document.createElement("span"); cb.className = "cb";
+    const tr = document.createElement("span"); tr.className = "track"; const f = document.createElement("span"); f.className = "fill ink"; f.style.width = (sg.mph / 10 * 100) + "%"; tr.appendChild(f);
+    const v = document.createElement("span"); v.className = "cbv"; v.textContent = sg.mph.toFixed(1) + " mph";
+    cb.append(tr, v); c2.appendChild(cb);
+    r.insertCell().textContent = `${sg.m} m in ${(sg.secs / 60).toFixed(1)} min`;
+  }
+  host.appendChild(t);
+})();
+
+/* ---------- waits at the stop ---------- */
+add("fig-wait", (host, W) => {
+  const all = D.wait.find(r => r.route === "all"), rows = D.wait.filter(r => r.route !== "all").sort((a, b) => b.median - a.median);
+  const list = [all].concat(rows), rowH = 19, m = { l: 34, r: 14, t: 24, b: 34 }, H = m.t + list.length * rowH + 10 + m.b;
+  const s = svgIn(host, W, H, "Waits at mid-route timepoints by route: median, middle half and 90th percentile");
+  const x = logs(1, 400, m.l, W - m.r);
+  for (const t of [2, 5, 15, 30, 60, 120, 240]) { vline(s, x(t), m.t - 4, H - m.b + 2, t === 15 ? "base" : "grid"); tx(s, x(t), H - m.b + 16, String(t), t === 15 ? "t-ink2" : "", "middle"); }
+  tx(s, x(15) + 4, m.t - 9, "15 minutes", "t-sm t-it t-ink2");
+  tx(s, W - m.r, H - 4, "minutes waiting (log scale)", "t-sm t-it", "end");
+  list.forEach((r, i) => {
+    const y = m.t + i * rowH + rowH / 2 + (i ? 10 : 0), c = r.route === "all" ? "ink" : r.over15 >= .4 ? "late" : "ink2";
+    tx(s, m.l - 8, y + 4, r.route === "all" ? "All" : r.route, r.route === "all" ? "t-ink t-strong" : "t-ink2", "end");
+    mk("line", { x1: x(r.p75), x2: x(r.p90), y1: y, y2: y, class: "w-" + c + " hair", style: "stroke-width:1" }, s);
+    mk("line", { x1: x(r.p25), x2: x(r.p75), y1: y, y2: y, class: "w-" + c + " thick" }, s);
+    mk("circle", { cx: x(r.median), cy: y, r: 4, class: "f-" + c + " ring" }, s);
+    if (i < 6) tx(s, x(r.median), y - 7, r.median.toFixed(r.median < 10 ? 1 : 0), "t-sm t-ink halo", "middle");
+    const hit = mk("rect", { x: 0, y: y - rowH / 2, width: W, height: rowH, class: "hit", tabindex: 0, "aria-label": `Route ${r.route}` }, s);
+    hover(hit, () => [r.route === "all" ? "All routes" : `Route ${r.route} ${routeName(r.route)}`, [
+      { v: r.median.toFixed(1) + " min", l: "median wait" },
+      { v: `${r.p25.toFixed(1)}–${r.p75.toFixed(1)} min`, l: "middle half" },
+      { v: Math.round(r.p90) + " min", l: "90th percentile" },
+      { v: pct(r.over15), l: "of waits over 15 min" },
+      { v: String(r.stranded), l: "with no bus for the rest of the day" }]]);
+  });
+  hline(s, 0, W, m.t + rowH + 4, "grid");
+  table("tv-wait", ["Route", "Timetabled calls", "Median (min)", "25th pct", "75th pct", "90th pct", "Over 15 min", "No bus after"],
+    list.map(r => [r.route, r.calls, r.median.toFixed(1), r.p25.toFixed(1), r.p75.toFixed(1), Math.round(r.p90), pct(r.over15), r.stranded]));
+});
+
+/* ---------- countdown accuracy ---------- */
+add("fig-predict", (host, W) => {
+  const P = D.predict, m = { l: 40, r: 10, t: 14 }, H1 = 230, H2 = 96, gap = 22, H = m.t + H1 + gap + H2 + 32;
+  const s = svgIn(host, W, H, "Prediction error by how far ahead the prediction was made");
+  const x = lin(0, 60, m.l, W - m.r), y = lin(-8, 8, m.t + H1, m.t);
+  for (const t of [-8, -4, 4, 8]) { hline(s, m.l, W - m.r, y(t), "grid"); tx(s, m.l - 6, y(t) + 4, sgn(t, 0, true) + (t === 8 ? " min" : ""), "", "end"); }
+  mk("path", { d: areaPath(P.map(p => [x(p.lead), y(p.q[4])]), P.map(p => [x(p.lead), y(p.q[0])])), class: "band" }, s);
+  mk("path", { d: areaPath(P.map(p => [x(p.lead), y(p.q[3])]), P.map(p => [x(p.lead), y(p.q[1])])), class: "band2" }, s);
+  hline(s, m.l, W - m.r, y(0), "base");
+  tx(s, m.l - 6, y(0) + 4, "0", "", "end");
+  mk("path", { d: linePath(P.map(p => [x(p.lead), y(p.q[2])])), class: "l-ink" }, s);
+  tx(s, m.l + 6, y(7) + 4, "bus later than predicted", "t-sm t-it");
+  tx(s, m.l + 6, y(-7) + 4, "bus earlier than predicted", "t-sm t-it");
+  const t2 = m.t + H1 + gap, y2 = lin(0, 1, t2 + H2 - 6, t2 + 14);
+  tx(s, m.l, t2 + 4, "share within ±2 minutes", "t-sm t-it t-ink2");
+  for (const t of [.5, 1]) { hline(s, m.l, W - m.r, y2(t), "grid"); tx(s, m.l - 6, y2(t) + 4, pct(t), "", "end"); }
+  hline(s, m.l, W - m.r, y2(0), "base");
+  const Wp = P.map(p => [x(p.lead), y2(p.within2)]);
+  mk("path", { d: linePath(Wp), class: "l-ink" }, s);
+  for (const i of [0, P.length - 1]) { mk("circle", { cx: Wp[i][0], cy: Wp[i][1], r: 3.5, class: "f-ink ring" }, s); tx(s, Wp[i][0] + (i ? -6 : 6), Wp[i][1] - 8, pct(P[i].within2), "t-ink2 t-sm", i ? "end" : "start"); }
+  for (let t = 0; t <= 60; t += 10) tx(s, x(t), H - 18, String(t), "", "middle");
+  tx(s, W - m.r, H - 2, "minutes ahead the prediction was made", "t-sm t-it", "end");
+  const xh = vline(s, -10, m.t, t2 + H2, "xhair"); xh.style.display = "none";
+  const hit = mk("rect", { x: m.l, y: m.t, width: W - m.l - m.r, height: t2 + H2 - m.t, class: "hit clear", tabindex: 0, "aria-label": "Prediction accuracy by lead time" }, s);
+  hover(hit, e => {
+    let p = P[4];
+    if (e && e.clientX != null && e.type !== "focus") {
+      const px = e.clientX - s.getBoundingClientRect().left, lead = (px - m.l) / (W - m.l - m.r) * 60;
+      p = P.reduce((b, q) => Math.abs(q.lead - lead) < Math.abs(b.lead - lead) ? q : b, P[0]);
+    }
+    xh.style.display = ""; xh.setAttribute("x1", Math.round(x(p.lead)) + .5); xh.setAttribute("x2", Math.round(x(p.lead)) + .5);
+    const f = v => sgn(v, 1, true);
+    return [`Predicted ${p.lead - 2.5}–${p.lead + 2.5} min ahead`, [
+      { v: f(p.q[2]) + " min", l: "median error" }, { v: `${f(p.q[1])} to ${f(p.q[3])}`, l: "middle half" },
+      { v: `${f(p.q[0])} to ${f(p.q[4])}`, l: "middle 80%" }, { v: pct(p.within2), l: "within ±2 min" },
+      { v: pct(p.early1), l: "bus a minute or more early" }, { v: p.n.toLocaleString("en-US"), l: "predictions" }]];
+  }, () => { xh.style.display = "none"; });
+  table("tv-predict", ["Minutes ahead", "Predictions", "10th pct", "25th", "Median", "75th", "90th pct", "Within ±2 min", "1+ min early"],
+    P.map(p => [`${p.lead - 2.5}–${p.lead + 2.5}`, p.n, ...p.q.map(v => v.toFixed(1)), pct(p.within2), pct(p.early1)]));
+});
+
+/* ---------- riders on board through the day ---------- */
+add("fig-riders", (host, W) => {
+  const H = 240, m = { l: 40, r: 12, t: 22, b: 30 };
+  const s = svgIn(host, W, H, "Riders on board all buses through the day, Thursday and Friday");
+  const x = lin(240, 1380, m.l, W - m.r), y = lin(0, 500, H - m.b, m.t);
+  for (const t of [100, 200, 300, 400, 500]) { hline(s, m.l, W - m.r, y(t), "grid"); tx(s, m.l - 6, y(t) + 4, String(t), "", "end"); }
+  hline(s, m.l, W - m.r, y(0), "base");
+  for (const h of [6, 9, 12, 15, 18, 21]) tx(s, x(h * 60), H - m.b + 16, hourLabel(h), "", "middle");
+  const cls = { "2026-09-24": "l-ran", "2026-09-25": "l-ink" };
+  for (const d of DAYS) {
+    const c = D.riders_curve[d] || [];
+    mk("path", { d: linePath(c.map(p => [x(p[0] + 2.5), y(p[1])])), class: cls[d] }, s);
+    const pk = c.reduce((b, p) => p[1] > b[1] ? p : b, c[0]);
+    mk("circle", { cx: x(pk[0] + 2.5), cy: y(pk[1]), r: 3.5, class: (d === DAYS[0] ? "f-ran" : "f-ink") + " ring" }, s);
+    tx(s, x(pk[0] + 2.5) + (d === DAYS[0] ? -7 : 7), y(pk[1]) - 6, `${Math.round(pk[1])} ${d === DAYS[0] ? "Thu" : "Fri"}`, "t-sm t-ink2", d === DAYS[0] ? "end" : "start");
+  }
+  const xh = vline(s, -10, m.t, H - m.b, "xhair"); xh.style.display = "none";
+  const idx = {}; for (const d of DAYS) idx[d] = Object.fromEntries((D.riders_curve[d] || []).map(p => [p[0], p]));
+  const hit = mk("rect", { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.b - m.t, class: "hit clear", tabindex: 0, "aria-label": "Riders on board through the day" }, s);
+  hover(hit, e => {
+    let mm = 940;
+    if (e && e.clientX != null && e.type !== "focus") { const px = e.clientX - s.getBoundingClientRect().left; mm = 240 + (px - m.l) / (W - m.l - m.r) * 1140; }
+    mm = clamp(Math.floor(mm / 5) * 5, 240, 1375);
+    xh.style.display = ""; xh.setAttribute("x1", Math.round(x(mm + 2.5)) + .5); xh.setAttribute("x2", Math.round(x(mm + 2.5)) + .5);
+    const rows = DAYS.map(d => { const p = idx[d][mm]; return p ? { v: `${Math.round(p[1])} riders`, l: `${DAYNAME[d]}, on ${Math.round(p[2])} buses`, key: d === DAYS[0] ? "ran" : "ink" } : { v: "–", l: DAYNAME[d] }; });
+    return [hhmm(mm), rows];
+  }, () => { xh.style.display = "none"; });
+  const hrs = []; for (let h = 4; h <= 22; h++) hrs.push(h);
+  table("tv-riders", ["Hour", "Thursday riders (avg)", "Friday riders (avg)"], hrs.map(h => {
+    const avg = d => { const v = (D.riders_curve[d] || []).filter(p => Math.floor(p[0] / 60) === h).map(p => p[1]); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null; };
+    return [`${h}:00`, avg(DAYS[0]), avg(DAYS[1])];
+  }));
+});
+
+/* ---------- fleet against the timetable ---------- */
+add("fig-fleet", (host, W) => {
+  const ph = 124, gap = 18, m = { l: 34, r: 12, t: 20, b: 26 }, H = 2 * ph + gap + m.b;
+  const s = svgIn(host, W, H, "Buses in service against trips in progress, Thursday and Friday");
+  const x = lin(240, 1380, m.l, W - m.r);
+  DAYS.forEach((d, di) => {
+    const oy = di * (ph + gap), g = mk("g", { transform: `translate(0,${oy})` }, s);
+    const y = lin(0, 60, ph - 6, m.t), rows = (D.fleet[d] || []).filter(r => r[0] >= 300);
+    tx(g, m.l, 12, DAYNAME[d], "t-it t-ink2");
+    for (const t of [20, 40, 60]) { hline(g, m.l, W - m.r, y(t), "grid"); tx(g, m.l - 6, y(t) + 4, String(t), "", "end"); }
+    hline(g, m.l, W - m.r, y(0), "base");
+    let run = [];
+    const flush = () => { if (run.length > 1) mk("path", { d: areaPath(run.map(r => [x(r[0] + 7.5), y(r[2])]), run.map(r => [x(r[0] + 7.5), y(r[1])])), class: "wash-late" }, g); run = []; };
+    for (const r of rows) { if (r[1] < r[2]) run.push(r); else flush(); }
+    flush();
+    mk("path", { d: linePath(rows.map(r => [x(r[0] + 7.5), y(r[2])])), class: "l-ran" }, g);
+    mk("path", { d: linePath(rows.map(r => [x(r[0] + 7.5), y(r[1])])), class: "l-ink", style: "stroke-width:1.6" }, g);
+    const xh = vline(g, -10, m.t, ph - 6, "xhair"); xh.style.display = "none";
+    const hit = mk("rect", { x: m.l, y: m.t, width: W - m.l - m.r, height: ph - 6 - m.t, class: "hit clear", tabindex: 0, "aria-label": `Fleet on ${DAYNAME[d]}` }, g);
+    hover(hit, e => {
+      let r = rows[Math.floor(rows.length / 2)];
+      if (e && e.clientX != null && e.type !== "focus") { const px = e.clientX - s.getBoundingClientRect().left, mm = 240 + (px - m.l) / (W - m.l - m.r) * 1140; r = rows.reduce((b, q) => Math.abs(q[0] + 7.5 - mm) < Math.abs(b[0] + 7.5 - mm) ? q : b, rows[0]); }
+      xh.style.display = ""; xh.setAttribute("x1", Math.round(x(r[0] + 7.5)) + .5); xh.setAttribute("x2", Math.round(x(r[0] + 7.5)) + .5);
+      return [`${DAYNAME[d]}, ${hhmm(r[0])}–${hhmm(r[0] + 15)}`, [{ v: String(r[1]), l: "buses in service", key: "ink" }, { v: String(r[2]), l: "trips in progress", key: "ran" }, { v: String(r[1] - r[2]), l: "difference" }]];
+    }, () => { xh.style.display = "none"; });
+  });
+  for (const h of [6, 9, 12, 15, 18, 21]) tx(s, x(h * 60), H - 8, hourLabel(h), "", "middle");
+  const rowsT = [];
+  for (const d of DAYS) for (const r of (D.fleet[d] || [])) if (r[0] % 60 === 0 && r[0] >= 300) rowsT.push([DAYNAME[d], hhmm(r[0]), r[1], r[2], r[1] - r[2]]);
+  table("tv-fleet", ["Day", "Time", "Buses in service", "Trips in progress", "Difference"], rowsT);
+});
+
+/* ---------- loads per route ---------- */
+add("fig-loads", (host, W) => {
+  const rows = D.loads, rowH = 18, m = { l: 34, r: 76, t: 30, b: 34 }, H = m.t + rows.length * rowH + m.b;
+  const s = svgIn(host, W, H, "Riders on board per bus-poll by route: median, middle half, 95th percentile and maximum");
+  const x = lin(0, 52, m.l, W - m.r);
+  for (const t of [0, 10, 20, 30, 40, 50]) { vline(s, x(t), m.t - 4, H - m.b + 2, t === 40 ? "base" : "grid"); tx(s, x(t), H - m.b + 16, String(t), "", "middle"); }
+  vline(s, x(48), m.t - 4, H - m.b + 2, "grid");
+  tx(s, x(40) - 4, m.t - 10, "every seat", "t-sm t-it t-ink2", "end");
+  tx(s, x(48) + 4, m.t - 10, "MATA’s limit", "t-sm t-it t-ink2", "start");
+  tx(s, W - m.r, H - 4, "riders on board", "t-sm t-it", "end");
+  rows.forEach((r, i) => {
+    const y = m.t + i * rowH + rowH / 2, c = r.full > 0 ? "late" : "ink2";
+    tx(s, m.l - 8, y + 4, r.route, "t-ink2", "end");
+    mk("line", { x1: x(r.p75), x2: x(r.p95), y1: y, y2: y, class: "w-" + c + " hair", style: "stroke-width:1" }, s);
+    mk("line", { x1: x(r.p25), x2: x(Math.max(r.p75, r.p25 + .3)), y1: y, y2: y, class: "w-" + c + " thick" }, s);
+    mk("line", { x1: x(r.max), x2: x(r.max), y1: y - 3.5, y2: y + 3.5, class: "w-" + c + " hair", style: "stroke-width:1" }, s);
+    mk("circle", { cx: x(r.p50), cy: y, r: 3.6, class: "f-" + c + " ring" }, s);
+    const hit = mk("rect", { x: 0, y: y - rowH / 2, width: W, height: rowH, class: "hit", tabindex: 0, "aria-label": `Route ${r.route}` }, s);
+    hover(hit, () => [`Route ${r.route} ${routeName(r.route)}`, [
+      { v: r.avg.toFixed(1), l: "riders on average" }, { v: String(r.p50), l: "median" }, { v: `${r.p25}–${r.p75}`, l: "middle half" },
+      { v: String(r.p95), l: "95th percentile" }, { v: String(r.max), l: "most seen" }, { v: (r.full * 100).toFixed(1) + "%", l: "of polls with 40 or more" }]]);
+  });
+  table("tv-loads", ["Route", "Average", "25th pct", "Median", "75th pct", "95th pct", "Max", "Polls with 40+"],
+    rows.map(r => [r.route, r.avg.toFixed(1), r.p25, r.p50, r.p75, r.p95, r.max, (r.full * 100).toFixed(2) + "%"]));
+});
+
+/* ---------- boardings (margin list) ---------- */
+(function boardList() {
+  const host = document.getElementById("board-list");
+  if (!host) return;
+  const ol = document.createElement("ol"); ol.className = "rank";
+  const top = D.boardings.slice(0, 7), mx = top[0].on;
+  for (const b of top) {
+    const li = document.createElement("li");
+    const a = document.createElement("span"); a.textContent = nice(b.stop);
+    const v = document.createElement("span"); v.className = "rv"; v.textContent = Math.round(b.on);
+    const bar = document.createElement("span"); bar.className = "rb"; bar.style.background = "var(--ink2)"; bar.style.width = (b.on / mx * 100) + "%";
+    li.append(a, v, bar); ol.appendChild(li);
+  }
+  host.appendChild(ol);
+})();
+
+/* ---------- the route table ---------- */
+(function routeTable() {
+  const host = document.getElementById("route-table");
+  if (!host) return;
+  const rows = D.route_table.map(r => Object.assign({ miss: r.scheduled ? r.never / r.scheduled : 0 }, r));
+  const bar = (v, cls) => {
+    const cb = document.createElement("span"); cb.className = "cb";
+    const tr = document.createElement("span"); tr.className = "track";
+    const f = document.createElement("span"); f.className = "fill " + cls; f.style.width = clamp(v * 100, 0, 100) + "%"; tr.appendChild(f);
+    const t = document.createElement("span"); t.className = "cbv"; t.textContent = pct(v);
+    cb.append(tr, t); return cb;
+  };
+  const cols = [
+    { h: "Route", key: r => +r.route, cell: (td, r) => { const n = document.createElement("span"); n.className = "rn"; n.textContent = r.route; const nm = document.createElement("span"); nm.className = "rname"; nm.textContent = routeName(r.route); td.append(n, nm); } },
+    { h: "Trips", key: r => r.scheduled, cell: (td, r) => { td.textContent = r.scheduled; } },
+    { h: "Never ran", key: r => r.miss, cell: (td, r) => { const cb = bar(r.miss, "late"); cb.lastChild.textContent = `${r.never} · ${pct(r.miss)}`; cb.lastChild.style.minWidth = "4.6em"; td.appendChild(cb); } },
+    { h: "On time", key: r => r.on_time, cell: (td, r) => td.appendChild(bar(r.on_time, "ontime")) },
+    { h: "5+ min late", key: r => r.late, cell: (td, r) => td.appendChild(bar(r.late, "late")) },
+    { h: "2+ min early", key: r => r.early, cell: (td, r) => td.appendChild(bar(r.early, "early")) },
+    { h: "Left on time", key: r => r.dep_on_time == null ? -1 : r.dep_on_time, cell: (td, r) => { td.textContent = r.dep_on_time == null ? "–" : `${pct(r.dep_on_time)} of ${r.dep_n}`; } },
+    { h: "Median wait", key: r => r.wait == null ? -1 : r.wait, cell: (td, r) => { td.textContent = r.wait == null ? "–" : r.wait.toFixed(1) + " min"; } },
+    { h: "Riders", key: r => r.riders, cell: (td, r) => { td.textContent = `${r.riders.toFixed(1)} (${r.p95})`; } }];
+  let sortI = 2, desc = true;
+  const t = document.createElement("table"); t.className = "rt";
+  const hr = t.createTHead().insertRow();
+  const ths = cols.map((c, i) => {
+    const th = document.createElement("th"); th.scope = "col";
+    const b = document.createElement("button"); b.type = "button"; b.textContent = c.h;
+    b.addEventListener("click", () => { if (sortI === i) desc = !desc; else { sortI = i; desc = i !== 0; } render(); });
+    th.appendChild(b); hr.appendChild(th); return th;
+  });
+  const tb = t.createTBody();
+  function render() {
+    ths.forEach((th, i) => { if (i === sortI) th.setAttribute("aria-sort", desc ? "descending" : "ascending"); else th.removeAttribute("aria-sort"); });
+    const sorted = rows.slice().sort((a, b) => (cols[sortI].key(a) - cols[sortI].key(b)) * (desc ? -1 : 1) || +a.route - +b.route);
+    tb.textContent = "";
+    for (const r of sorted) { const tr = tb.insertRow(); for (const c of cols) c.cell(tr.insertCell(), r); }
+  }
+  render();
+  host.appendChild(t);
+})();
+
+/* ---------- method: the even-number comb ---------- */
+add("fig-comb", (host, W) => {
+  const C = D.capacity.comb, H = 170, m = { l: 44, r: 8, t: 12, b: 30 };
+  const s = svgIn(host, W, H, "Count of load readings at each percentage; every odd value is empty");
+  const x = lin(-1, 101, m.l, W - m.r), mx = Math.max(...C.map(c => c[1]));
+  const y = v => (H - m.b) - Math.sqrt(v / mx) * (H - m.b - m.t);
+  for (const t of [5000, 20000, 50000]) { hline(s, m.l, W - m.r, y(t), "grid"); tx(s, m.l - 6, y(t) + 4, t / 1000 + "k", "", "end"); }
+  const bw = Math.max(1, (x(1) - x(0)) * .8);
+  for (const [v, n] of C) {
+    mk("rect", { x: x(v) - bw / 2, y: y(n), width: bw, height: (H - m.b) - y(n), class: v % 2 ? "f-late" : "f-ink2" }, s);
+  }
+  hline(s, m.l, W - m.r, y(0), "base");
+  for (let v = 1; v < 100; v += 2) mk("circle", { cx: x(v), cy: H - m.b + 5, r: 1.5, class: "f-late" }, s);
+  tx(s, W - m.r, m.t + 10, "each red dot below the axis is an odd value, with no readings", "t-sm t-it t-ink2", "end");
+  for (const t of [0, 20, 40, 60, 80, 100]) tx(s, x(t), H - m.b + 20, t + "%", "", "middle");
+  const hit = mk("rect", { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.b - m.t, class: "hit clear", tabindex: 0, "aria-label": "Load readings by percentage" }, s);
+  const cm = Object.fromEntries(C);
+  hover(hit, e => {
+    let v = 10;
+    if (e && e.clientX != null && e.type !== "focus") { const px = e.clientX - s.getBoundingClientRect().left; v = clamp(Math.round(-1 + (px - m.l) / (W - m.l - m.r) * 102), 0, 100); }
+    return [`${v}% load (${v / 2} riders)`, [{ v: (cm[v] || 0).toLocaleString("en-US"), l: "readings" }]];
+  });
+  table("tv-comb", ["Load %", "Riders", "Readings"], C.map(([v, n]) => [v + "%", v / 2, n]));
+});
+
+/* ---------- method: occupancy categories ---------- */
+add("fig-cats", (host, W) => {
+  const names = { EMPTY: "Empty", MANY_SEATS_AVAILABLE: "Many seats", FEW_SEATS_AVAILABLE: "Few seats", STANDING_ROOM_ONLY: "Standing room only", none: "no category given", FULL: "Full" };
+  const rows = D.capacity.categories, rowH = 22, lw = Math.min(150, W * .38), m = { l: lw, r: 12, t: 10, b: 32 }, H = m.t + rows.length * rowH + m.b;
+  const s = svgIn(host, W, H, "Riders on board for each occupancy category in MATA's feed");
+  const x = lin(0, 52, m.l, W - m.r);
+  for (const t of [0, 10, 20, 30, 40, 50]) { vline(s, x(t), m.t, H - m.b + 2, t === 40 ? "base" : "grid"); tx(s, x(t), H - m.b + 16, String(t), "", "middle"); }
+  tx(s, W - m.r, H - 2, "riders on board (40: every seat)", "t-sm t-it", "end");
+  rows.forEach((r, i) => {
+    const y = m.t + i * rowH + rowH / 2;
+    tx(s, m.l - 10, y + 4, names[r.cat] || r.cat, "t-ink2", "end");
+    mk("line", { x1: x(r.p5 / 2), x2: x(Math.max(r.p95 / 2, r.p5 / 2 + .2)), y1: y, y2: y, class: "w-ink2 thick", style: "stroke-width:2.5" }, s);
+    mk("circle", { cx: x(r.p50 / 2), cy: y, r: 3.8, class: "f-ink ring" }, s);
+    const hit = mk("rect", { x: 0, y: y - rowH / 2, width: W, height: rowH, class: "hit", tabindex: 0, "aria-label": names[r.cat] || r.cat }, s);
+    hover(hit, () => [names[r.cat] || r.cat, [{ v: `${r.p5 / 2}–${r.p95 / 2}`, l: "riders, middle 90%" }, { v: String(r.p50 / 2), l: "median riders" }, { v: String(r.n), l: "matched reports" }]]);
+  });
+  table("tv-cats", ["Category", "Reports", "5th pct riders", "Median riders", "95th pct riders"], rows.map(r => [names[r.cat] || r.cat, r.n, r.p5 / 2, r.p50 / 2, r.p95 / 2]));
+});
+
+/* ---------- method: speed agreement ---------- */
+add("fig-speed", (host, W) => {
+  const G = D.speed.grid, S = Math.min(W, 380), m = { l: 34, b: 34, t: 8, r: 8 }, H = S;
+  const s = svgIn(host, W, H, "Tracker speed against official speed for matched reports");
+  const moving = G.filter(g => g[0] || g[1]), still = G.find(g => !g[0] && !g[1]);
+  const x = lin(0, 25, m.l, S - m.r), y = lin(0, 25, H - m.b, m.t), mx = Math.max(...moving.map(g => g[2])), cell = (x(1) - x(0));
+  mk("line", { x1: x(0), y1: y(0), x2: x(25), y2: y(25), class: "grid" }, s);
+  for (const t of [5, 10, 15, 20, 25]) { tx(s, x(t), H - m.b + 15, String(t), "", "middle"); tx(s, m.l - 6, y(t) + 4, String(t), "", "end"); }
+  tx(s, m.l - 6, H - m.b + 15, "0", "", "end");
+  hline(s, m.l, S - m.r, y(0), "base"); vline(s, m.l, m.t, H - m.b, "base");
+  for (const [a, b, n] of moving) {
+    const r = Math.max(1, Math.sqrt(n / mx) * cell * .95);
+    mk("circle", { cx: x(a), cy: y(b), r, class: (a === b ? "f-ink" : "f-late") + " ring", style: "stroke-width:1" }, s);
+  }
+  if (still) {
+    mk("circle", { cx: x(0), cy: y(0), r: cell * .95, class: "o-ink2" }, s);
+    tx(s, x(4.5), y(1.4), `circle at 0, 0: ${still[2].toLocaleString("en-US")} reports of stopped buses`, "t-sm t-it t-ink2");
+  }
+  tx(s, S - m.r, H - 2, "tracker speed", "t-sm t-it", "end");
+  tx(s, m.l + 4, m.t + 10, "official speed, m/s", "t-sm t-it");
+  const hit = mk("rect", { x: m.l, y: m.t, width: S - m.l - m.r, height: H - m.b - m.t, class: "hit clear", tabindex: 0, "aria-label": "Speed agreement" }, s);
+  const gm = {}; for (const [a, b, n] of G) gm[a + "|" + b] = n;
+  hover(hit, e => {
+    let a = 10, b = 10;
+    if (e && e.clientX != null && e.type !== "focus") { const bb = s.getBoundingClientRect(); a = clamp(Math.round((e.clientX - bb.left - m.l) / cell), 0, 25); b = clamp(Math.round((H - m.b - (e.clientY - bb.top)) / cell), 0, 25); }
+    return [`tracker ${a}, official ${b} m/s`, [{ v: String(gm[a + "|" + b] || 0), l: "matched reports" }]];
+  });
+  table("tv-speed", ["Tracker speed", "Official speed (m/s)", "Reports"], G.slice().sort((p, q) => q[2] - p[2]).slice(0, 40).map(g => [g[0], g[1], g[2]]));
+});
+
+/* ---------- method: still stretches ---------- */
+(function ghostTable() {
+  const host = document.getElementById("ghost-table");
+  if (!host) return;
+  const mins = { "6-9": "1–1.5 min", "10-19": "2–3.5 min", "20-29": "3.5–5.5 min", "30+": "5.5 min or more" };
+  const t = document.createElement("table"); t.className = "rt";
+  const hr = t.createTHead().insertRow();
+  for (const h of ["Still for", "Stretches", "Dead tracker", "Waiting at a line’s end", "Waiting mid-route", "Left the feed"]) { const th = document.createElement("th"); th.textContent = h; hr.appendChild(th); }
+  const tb = t.createTBody();
+  for (const g of D.ghost_streaks) {
+    const r = tb.insertRow();
+    r.insertCell().textContent = mins[g.polls] || g.polls;
+    r.insertCell().textContent = g.streaks.toLocaleString("en-US");
+    const c = r.insertCell(); const cb = document.createElement("span"); cb.className = "cb";
+    const tr = document.createElement("span"); tr.className = "track"; const f = document.createElement("span"); f.className = "fill late"; f.style.width = (g.dead / g.streaks * 100) + "%"; tr.appendChild(f);
+    const v = document.createElement("span"); v.className = "cbv"; v.textContent = String(g.dead); cb.append(tr, v); c.appendChild(cb);
+    r.insertCell().textContent = g.layover.toLocaleString("en-US");
+    r.insertCell().textContent = g.hold.toLocaleString("en-US");
+    r.insertCell().textContent = String(g.left);
+  }
+  host.appendChild(t);
+})();
+})();
+</script>

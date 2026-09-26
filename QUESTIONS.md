@@ -77,8 +77,8 @@ bunching / headways and where delay accumulates.
 ## 5. Needs more than the current design
 
 - **Detour impact.** Delay and ridership on detoured vs normal days. The
-  poller now logs detours hourly (`data/detours/`, see `DESIGN.md`), from
-  its first restart after 2026-09-25; needs weeks of that log.
+  poller now logs detours hourly (`data/detours/`, see `DESIGN.md`), since
+  2026-09-25 at 20:12; needs weeks of that log.
 - **Self-computed schedule adherence** (instead of the vendor's number) —
   the timetable and trip matching now exist (`schedule.py`), and actual −
   scheduled agreed with the vendor's delay when checked. A non-goal in

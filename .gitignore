@@ -8,3 +8,5 @@ topo.json
 topo_version.txt
 probe_samples.json
 detours.geojson
+findings_page/snapshot/
+findings_page/out/
