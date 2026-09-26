@@ -1,6 +1,7 @@
 """
 CADAVL (MATA SWIV) -> position history, live snapshot, GTFS-Realtime feed.
-Also archives MATA's official GTFS-RT feeds (official_feed.py).
+Also archives MATA's official GTFS-RT feeds (official_feed.py) and, hourly,
+detours and rider messages (cadavl_detours.py).
 
 Mapping verified against a real /topo/vehicules payload (41 buses, 20 lines).
 
@@ -18,6 +19,7 @@ import csv
 import gzip
 import json
 import re
+import sys
 import time
 from collections import deque
 from datetime import datetime, timezone
@@ -60,12 +62,11 @@ HEADERS = {
     "User-Agent": "mata-position-archiver/0.1 (personal research; you@example.com)",
 }
 
-# `vitesse` units are unconfirmed (observed range 0-20). GTFS-RT wants metres
-# per second. Set this once you've measured it, and speed will be emitted.
-#   "unknown" -> omit speed from the feed (default, and correct for now)
-#   "mph" | "kmh" | "ms"
-SPEED_UNIT = "unknown"
-_SPEED_TO_MS = {"mph": 0.44704, "kmh": 0.27778, "ms": 1.0}
+# `vitesse` is metres per second, in whole numbers, which is what GTFS-RT
+# wants: it equals the official feed's speed for the same report (97% of
+# moving buses, 2026-09-25), and matches the distance buses cover. About 1 in
+# 1,200 readings is impossible (up to 347); the feed leaves those out.
+MAX_SPEED_MS = 40           # ~90 mph
 
 
 # --------------------------------------------------------------------------
@@ -184,7 +185,7 @@ def normalize_vehicle(raw: dict, fetched_at: int) -> dict | None:
         "lat": float(loc["lat"]),
         "lon": float(loc["lng"]),
         "bearing": loc.get("cap"),                     # degrees, 0-360
-        "speed_raw": drive.get("vitesse"),             # units unconfirmed
+        "speed_raw": drive.get("vitesse"),             # metres per second
         "occupancy_pct": parse_occupancy(raw.get("vehiculeLoad")),
         "destination": drive.get("destination"),       # headsign, not a trip id
         "next_stop_name": (next_stop or {}).get("nomCommercial"),
@@ -243,8 +244,8 @@ def build_feed(vehicles: list[dict], header_time: int):
         vp.position.longitude = v["lon"]
         if v.get("bearing") is not None:
             vp.position.bearing = float(v["bearing"])
-        if SPEED_UNIT in _SPEED_TO_MS and v.get("speed_raw") is not None:
-            vp.position.speed = float(v["speed_raw"]) * _SPEED_TO_MS[SPEED_UNIT]
+        if v.get("speed_raw") is not None and v["speed_raw"] <= MAX_SPEED_MS:
+            vp.position.speed = float(v["speed_raw"])
 
         if v.get("occupancy_pct") is not None:
             vp.occupancy_percentage = v["occupancy_pct"]
@@ -377,12 +378,36 @@ def refresh_crosswalk(session: requests.Session) -> bool:
     return True
 
 
+class Stamped:
+    """The poller's stdout: each line starts with the local date and time,
+    so poller.log says when things happened. Every module's print() goes
+    through it."""
+
+    def __init__(self, out) -> None:
+        self.out = out
+        self.line_start = True
+
+    def write(self, s: str) -> int:
+        for part in s.splitlines(keepends=True):
+            if self.line_start:
+                self.out.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S "))
+            self.out.write(part)
+            self.line_start = part.endswith("\n")
+        return len(s)
+
+    def __getattr__(self, name):
+        return getattr(self.out, name)
+
+
 def run_poller() -> None:
+    import cadavl_detours       # imports this module; avoid the cycle at load
+    sys.stdout = Stamped(sys.stdout)
     session = requests.Session()
     stale = StaleTracker()
     trails = Trails()
     schedule = Schedule()
     official = Official()
+    detours = cadavl_detours.DetourLog()
     polls = 0
     topo_checked = 0
 
@@ -425,13 +450,21 @@ def run_poller() -> None:
                 official.update(session, fetched_at)
             except Exception as exc:    # an extra archive; never lose a poll to it
                 print(f"official feed archive failed: {exc!r}")
+            try:                        # hourly; ~150 KB, a few seconds
+                detours.update(session, fetched_at, route_id_for)
+            except Exception as exc:    # likewise
+                print(f"detour log failed: {exc!r}")
 
         except (requests.RequestException, OSError) as exc:
             # OSError covers Windows refusing to replace latest.json while
             # http.server has it open; the next poll rewrites it anyway.
             print(f"poll failed: {exc}")
 
-        time.sleep(POLL_SECONDS)
+        # To the next tick of a fixed 10 s clock, not 10 s after this poll
+        # (which took 1-4 s): polls stay 10 s apart, so every row is 10 s of
+        # bus-time and 30 unchanged polls are 5 minutes. A poll that overruns
+        # (a 10 s timeout) skips a tick rather than crowding the next one.
+        time.sleep(POLL_SECONDS - time.time() % POLL_SECONDS)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 """
-Probe the CADAVL feed's true update cadence and settle the `vitesse` unit.
+Probe the CADAVL feed's true update cadence and check the `vitesse` unit
+(settled as m/s in DESIGN.md, from the archives; this is a cross-check).
 
 The payload has no timestamps, so the only way to learn how often the server
 actually refreshes is to poll fast and watch when positions change.
@@ -109,8 +110,8 @@ def analyze(samples: list[tuple[float, dict]]) -> None:
         print(f"median implied_ms / reported vitesse = {med:.3f} "
               f"(n={len(ratios)})")
         print(f"closest match: {best} (expected {UNIT_HINTS[best]})")
-        print(f"-> set SPEED_UNIT = "
-              f"{ {'mph': 'mph', 'km/h': 'kmh', 'm/s': 'ms'}[best]!r}")
+        print("-> agrees with DESIGN.md (m/s)" if best == "m/s"
+              else "-> DESIGN.md says m/s; this probe disagrees, look again")
     else:
         print("not enough moving vehicles to judge")
 

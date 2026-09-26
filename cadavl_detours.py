@@ -8,14 +8,23 @@ replacement geometry, and which stops are affected. In the sample it was
 
 It changes on the scale of days, not seconds. Poll it hourly at most.
 
+The poller does, through `DetourLog`: once an hour it saves the detours and
+the tracker's rider messages (/iv/message: "Route 11 Out of service
+Outbound from Thomas & Whitney @ 7:45 PM...") to
+data/detours/dt=YYYY-MM-DD/detours.jsonl.gz whenever they changed, so
+detour impact can be studied later.
+
     python cadavl_detours.py --sample refresh.json
 """
 
 from __future__ import annotations
 
 import argparse
+import csv
+import gzip
 import json
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
@@ -24,6 +33,9 @@ from google.transit import gtfs_realtime_pb2
 from cadavl_to_gtfs_rt import BASE, HEADERS, route_id_for
 
 REFRESH_SECONDS = 3600
+HERE = Path(__file__).parent
+STOPS_CSV = HERE / "stops.csv"
+LOG_DIR = HERE / "data" / "detours"
 
 
 def fetch_refresh(session: requests.Session) -> dict:
@@ -71,8 +83,11 @@ def segments_to_linestring(segment_ids: list[int],
     return coords
 
 
-def parse_detours(payload: dict) -> list[dict]:
-    """One record per affected line."""
+def parse_detours(payload: dict, route_for=route_id_for) -> list[dict]:
+    """One record per affected line. `route_for` maps a line ID to its
+    route; the poller passes its own, which follows crosswalk rebuilds."""
+    if not payload.get("update"):
+        return []
     update = payload["update"][0]
     index = build_segment_index(payload)
 
@@ -92,7 +107,7 @@ def parse_detours(payload: dict) -> list[dict]:
                        for grp in line.get("tronconsDeviation", [])]
         detours.append({
             "line_internal_id": line_id,
-            "route_id": route_id_for(line_id),
+            "route_id": route_for(line_id),
             "bypassed_segment_ids": bypassed,
             "affected_stop_ids": stops_by_line.get(line_id, []),
             "detour_paths": [segments_to_linestring(ids, index)
@@ -177,6 +192,53 @@ def build_alerts_feed(detours: list[dict], header_time: int,
             stop_entity.stop_id = f"cadavl:{stop_id}"
 
     return feed
+
+
+# --------------------------------------------------------------------------
+# The poller's detour log
+# --------------------------------------------------------------------------
+
+def stop_codes() -> dict[int, str]:
+    """CADAVL stop ID -> stop code (stops.csv). Codes survive the vendor's
+    renumberings; IDs don't."""
+    with STOPS_CSV.open(encoding="utf-8") as fh:
+        return {int(r["stop_internal_id"]): r["stop_code"] for r in csv.DictReader(fh)}
+
+
+class DetourLog:
+    """The poller's handle. Once an hour: the lines on detour (route, the
+    stops they skip as stop codes, how many segments are bypassed, the
+    replacement paths) and every rider message with the routes it names,
+    appended to data/detours/dt=YYYY-MM-DD/detours.jsonl.gz (UTC date) only
+    when that differs from the last one saved. A restart saves once more."""
+
+    def __init__(self) -> None:
+        self.due = 0
+        self.last: dict | None = None
+
+    def update(self, session: requests.Session, now: int, route_for=route_id_for) -> None:
+        if now < self.due:
+            return
+        self.due = now + REFRESH_SECONDS    # after a failure too: detours change over days
+        codes = stop_codes()
+        state = {
+            "detours": [{"route_id": d["route_id"],
+                         "stops": [codes.get(s, f"cadavl:{s}") for s in d["affected_stop_ids"]],
+                         "bypassed_segments": len(d["bypassed_segment_ids"]),
+                         "paths": d["detour_paths"]}
+                        for d in parse_detours(fetch_refresh(session), route_for)],
+            "messages": [{"routes": sorted({route_for(line["idLigne"]) for line in m.get("ligne", [])}),
+                          "text": m["message"].strip()}
+                         for m in fetch_messages(session) if (m.get("message") or "").strip()],
+        }
+        if state == self.last:
+            return
+        self.last = state
+        day = datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%d")
+        path = LOG_DIR / f"dt={day}" / "detours.jsonl.gz"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with gzip.open(path, "at", encoding="utf-8") as fh:
+            fh.write(json.dumps({"fetched_at": now, **state}, separators=(",", ":")) + "\n")
 
 
 # --------------------------------------------------------------------------
