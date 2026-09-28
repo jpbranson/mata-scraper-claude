@@ -471,9 +471,10 @@ The file also defines views over the rest of `data/`: `ghost_rows` (the
 positions a dead tracker left behind, for anything spatial), `arrivals`,
 `sched` (the saved timetables, one row per scheduled call), `timepoints`,
 `line_ends`, `stops`, the official archive (`off_vehicles`, `off_trip_updates`,
-`off_alerts`), and two joins of them, `arrivals_due` (each arrival with
-the time its trip was due) and `trip_service` (each scheduled trip and
-whether any bus ran it). After the views come the queries behind
+`off_alerts`), the detour log's rider messages (`rider_messages`, each
+with the routes its text names where MATA's tags disagree), and two
+joins of them, `arrivals_due` (each arrival with the time its trip was
+due) and `trip_service` (each scheduled trip and whether any bus ran it). After the views come the queries behind
 `FINDINGS.md`, grouped as in `QUESTIONS.md` and tagged (`[Q1]`, `[GPS]`,
 `[MISSED]`, …) so the findings can cite them. The whole file takes about
 a minute; each query also runs on its own after the views.
@@ -558,7 +559,7 @@ since the last one saved (checked hourly, and once at every start).
 |---|---|
 | `fetched_at` | Unix seconds |
 | `detours` | One per line on detour: `route_id`, `stops` (stop codes it skips), `bypassed_segments` (count), `paths` (replacement geometry, lists of `[lon, lat]`) |
-| `messages` | Every rider message: `routes` it names, `text` |
+| `messages` | Every rider message: `routes` MATA tagged it with (occasionally wrong; `rider_messages` in `analysis.sql` prefers the routes its text names), `text` |
 
 A route's detour runs from the first line that lists it to the first
 that doesn't.

@@ -133,6 +133,31 @@ CREATE VIEW off_alerts AS
 SELECT feed_ts, unnest(alerts, max_depth := 2)
 FROM read_json_auto('data/official/*/alerts.jsonl.gz');
 
+-- The tracker's rider messages (cadavl_detours.py), from 2026-09-25: one
+-- row per message per snapshot in which the detours or messages changed.
+-- `tagged` is the routes MATA attached to the message, `named` the ones
+-- its text names ("Routes 12, 34, 04 ... diverted"). The tags are
+-- occasionally wrong ("Route 36 is not running from Centennial Dr @ Hacks
+-- Cross Rd" tagged 42, and only 36 serves that stop), so `routes` takes
+-- the text's when it names any and the tags when not ("Trolley 1 Out of
+-- service"); `mismatch` marks the two disagreeing.
+CREATE VIEW rider_messages AS
+WITH m AS (
+    SELECT fetched_at, unnest(messages, max_depth := 2)
+    FROM read_json('data/detours/*/detours.jsonl.gz',
+                   columns = {fetched_at: 'BIGINT',
+                              messages: 'STRUCT(routes VARCHAR[], text VARCHAR)[]'})),
+n AS (
+    SELECT *, list_sort(list_distinct(list_transform(
+                  regexp_extract_all(regexp_extract(text, '(?i)\bRoutes?\s+((?:\d+\s*(?:,|and|&)?\s*)+)', 1), '\d+'),
+                  x -> printf('%02d', x::INTEGER)))) AS named
+    FROM m)
+SELECT fetched_at, to_timestamp(fetched_at) AT TIME ZONE 'America/Chicago' AS t,
+       text, list_sort(routes) AS tagged, named,
+       CASE WHEN len(named) > 0 THEN named ELSE list_sort(routes) END AS routes,
+       len(named) > 0 AND named <> list_sort(routes) AS mismatch
+FROM n;
+
 -- Arrivals with the time their trip was due at that stop (the nearest
 -- call, for trips that pass a stop twice), leaving out any a dead
 -- tracker timed and the ends of lines (see line_ends).
