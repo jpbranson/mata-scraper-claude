@@ -115,7 +115,6 @@ class Timetable:
                     self.due[(route, head, code)].append((self.t0 + secs, r["trip_id"]))
         for times in self.due.values():
             times.sort()
-        self.headsign = {t: head for t, (_, head, _, _) in all_trips.items()}
 
         with STOPS_CSV.open(encoding="utf-8") as fh:
             stops = {r["stop_code"]: r for r in csv.DictReader(fh)}

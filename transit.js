@@ -1,5 +1,5 @@
-// Shared by strips.html and schematic.html: delay tiers (same as map.html),
-// live data, and placing a live bus along its route's stop pattern. Patterns
+// Shared by map.html (delay tiers, helpers), strips.html and schematic.html
+// (also live data, and placing a live bus along its route's stop pattern). Patterns
 // come from the day's data/schedule/<day>/<route>.json (schedule.py): per
 // headsign, stops in order as [code, name, lat, lon, seconds from first stop,
 // timepoint].
@@ -13,6 +13,8 @@ const TROLLEY = new Set(["100"]);
 function tier(v) {
   const d = v.delay_seconds;
   if (d == null) return "ontime";
+  // "1h+" values are floors, early or late. Pollers before the parse fix
+  // stored them as 0, direction unknown: grey.
   if (v.delay_capped) return d > 0 ? "late20" : d < 0 ? "early" : "ontime";
   if (d >= 1200) return "late20";
   if (d >= 600) return "late10";
@@ -157,7 +159,7 @@ function timeline(onShow) {
   const tick = async () => {
     const j = await getJSON("data/latest.json");
     if (!j) return;
-    const day = j.day ?? new Date(j.fetched_at * 1000).toLocaleDateString("en-CA", { timeZone: TZ });
+    const day = j.day;
     live = { t: j.fetched_at, day, vehicles: j.vehicles };
     // First load, or the service day rolled over while watching live.
     if (day !== serverDay && (serverDay == null || cursor == null)) {

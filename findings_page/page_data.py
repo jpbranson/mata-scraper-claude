@@ -359,22 +359,19 @@ D["slow"] = [{"route": r, "from": f, "to": t, "passes": n, "m": r1(m_, 0), "secs
 note("SLOW", [(d["route"], d["from"], d["to"], d["mph"]) for d in D["slow"]])
 
 # ---------------------------------------------------------------- headways
-hw = one("""WITH a AS (
-    SELECT *, lag(t) OVER w AS prev_t, lag(t_sched) OVER w AS prev_sched, lag(vehicle) OVER w AS prev_vehicle
-    FROM arrivals_due WINDOW w AS (PARTITION BY day, route, stop ORDER BY t, t_sched))
-SELECT count(*) FILTER (WHERE prev_sched IS NOT NULL),
+con.sql("""CREATE TABLE hw_lag AS
+SELECT *, lag(t) OVER w AS prev_t, lag(t_sched) OVER w AS prev_sched, lag(vehicle) OVER w AS prev_vehicle
+FROM arrivals_due WINDOW w AS (PARTITION BY day, route, stop ORDER BY t, t_sched)""")
+hw = one("""SELECT count(*) FILTER (WHERE prev_sched IS NOT NULL),
        count(*) FILTER (WHERE t_sched < prev_sched AND vehicle <> prev_vehicle),
        count(*) FILTER (WHERE prev_t IS NOT NULL AND vehicle <> prev_vehicle AND t_sched > prev_sched
                           AND t - prev_t < (t_sched - prev_sched) / 4),
        count(*) FILTER (WHERE prev_t IS NOT NULL AND vehicle <> prev_vehicle AND t_sched > prev_sched
                           AND t - prev_t > (t_sched - prev_sched) * 1.5),
        count(*) FILTER (WHERE prev_t IS NOT NULL AND vehicle <> prev_vehicle AND t_sched > prev_sched)
-FROM a""")
+FROM hw_lag""")
 D["headway"] = {"pairs": hw[0], "overtakes": hw[1], "bunched": hw[2], "gaps": hw[3], "valid_pairs": hw[4]}
-hwr = rows("""WITH a AS (
-    SELECT *, lag(t) OVER w AS prev_t, lag(t_sched) OVER w AS prev_sched, lag(vehicle) OVER w AS prev_vehicle
-    FROM arrivals_due WINDOW w AS (PARTITION BY day, route, stop ORDER BY t, t_sched)),
-pairs AS (SELECT route, t - prev_t AS actual, t_sched - prev_sched AS planned FROM a
+hwr = rows("""WITH pairs AS (SELECT route, t - prev_t AS actual, t_sched - prev_sched AS planned FROM hw_lag
           WHERE prev_t IS NOT NULL AND vehicle <> prev_vehicle AND t_sched > prev_sched)
 SELECT route, count(*), median(planned) / 60, avg((actual > planned * 1.5)::int),
        (sum(actual * actual) / (2 * sum(actual)) - sum(planned * planned) / (2 * sum(planned))) / 60
@@ -475,32 +472,25 @@ FROM w GROUP BY ROLLUP (route) ORDER BY 3 DESC, 1""")
 D["wait"] = [{"route": r, "calls": n, "median": r1(md), "p25": r1(a), "p75": r1(b), "p90": r1(c, 0),
               "over15": r1(o15, 3), "stranded": st} for r, n, md, a, b, c, o15, st in sw]
 note("WAIT", D["wait"])
-pf = rows("""WITH pr AS (
+con.sql("""CREATE TABLE predictions AS
+WITH pr AS (
     SELECT day, feed_ts, trip_id AS trip, unnest(stops, max_depth := 2)
-    FROM off_trip_updates WHERE vehicle_id IS NOT NULL),
-j AS (
-    SELECT pr.feed_ts, coalesce(pr.departure, pr.arrival) AS predicted, a.t AS actual
-    FROM pr JOIN arrivals a ON a.day = pr.day AND a.trip = pr.trip AND '0:' || a.stop = pr.stop_id
-    WHERE coalesce(pr.departure, pr.arrival) >= pr.feed_ts AND a.t >= pr.feed_ts)
-SELECT (predicted - feed_ts) // 300 AS b, count(*),
+    FROM off_trip_updates WHERE vehicle_id IS NOT NULL)
+SELECT pr.feed_ts, coalesce(pr.departure, pr.arrival) AS predicted, a.t AS actual
+FROM pr JOIN arrivals a ON a.day = pr.day AND a.trip = pr.trip AND '0:' || a.stop = pr.stop_id
+WHERE coalesce(pr.departure, pr.arrival) >= pr.feed_ts AND a.t >= pr.feed_ts""")
+pf = rows("""SELECT (predicted - feed_ts) // 300 AS b, count(*),
        quantile_cont(actual - predicted, [0.1, 0.25, 0.5, 0.75, 0.9]),
        avg((abs(actual - predicted) <= 120)::int), avg((actual - predicted < -60)::int),
        avg((actual - predicted > 300)::int)
-FROM j WHERE predicted - feed_ts < 3600 GROUP BY 1 ORDER BY 1""")
+FROM predictions WHERE predicted - feed_ts < 3600 GROUP BY 1 ORDER BY 1""")
 D["predict"] = [{"lead": int(b) * 5 + 2.5, "n": n, "q": [r1(x / 60, 2) for x in q], "within2": r1(w2, 3),
                  "early1": r1(e1, 3), "late5": r1(l5, 3)} for b, n, q, w2, e1, l5 in pf]
-pb = rows("""WITH pr AS (
-    SELECT day, feed_ts, trip_id AS trip, unnest(stops, max_depth := 2)
-    FROM off_trip_updates WHERE vehicle_id IS NOT NULL),
-j AS (
-    SELECT pr.feed_ts, coalesce(pr.departure, pr.arrival) AS predicted, a.t AS actual
-    FROM pr JOIN arrivals a ON a.day = pr.day AND a.trip = pr.trip AND '0:' || a.stop = pr.stop_id
-    WHERE coalesce(pr.departure, pr.arrival) >= pr.feed_ts AND a.t >= pr.feed_ts)
-SELECT CASE WHEN predicted - feed_ts < 300 THEN '0-5' WHEN predicted - feed_ts < 600 THEN '5-10'
+pb = rows("""SELECT CASE WHEN predicted - feed_ts < 300 THEN '0-5' WHEN predicted - feed_ts < 600 THEN '5-10'
             WHEN predicted - feed_ts < 1200 THEN '10-20' WHEN predicted - feed_ts < 2400 THEN '20-40' ELSE '40+' END,
        count(*), avg((abs(actual - predicted) <= 120)::int), avg((actual - predicted < -60)::int),
        avg((actual - predicted > 300)::int), median(actual - predicted) / 60
-FROM j GROUP BY 1 ORDER BY min(predicted - feed_ts)""")
+FROM predictions GROUP BY 1 ORDER BY min(predicted - feed_ts)""")
 D["predict_buckets"] = [{"bucket": b, "n": n, "within2": r1(w, 3), "early1": r1(e, 3), "late5": r1(l, 3),
                          "median": r1(md, 1)} for b, n, w, e, l, md in pb]
 note("PREDICT", D["predict_buckets"])
