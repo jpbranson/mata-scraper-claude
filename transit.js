@@ -157,7 +157,7 @@ function timeline(onShow) {
   const tick = async () => {
     const j = await getJSON("data/latest.json");
     if (!j) return;
-    const day = j.day ?? new Date(j.fetched_at * 1000).toLocaleDateString("en-CA", { timeZone: TZ });
+    const day = j.day;
     live = { t: j.fetched_at, day, vehicles: j.vehicles };
     // First load, or the service day rolled over while watching live.
     if (day !== serverDay && (serverDay == null || cursor == null)) {

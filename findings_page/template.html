@@ -704,9 +704,6 @@ add("fig-direction", (host, W) => {
 });
 
 /* ---------- lateness by hour ---------- */
-function hourAxis(g, x, y0, labelY, hours, from, to) {
-  for (const h of hours) { vline(g, x(h), y0, labelY - 12, "grid"); tx(g, x(h), labelY, hourLabel(h), "", "middle"); }
-}
 add("fig-hour", (host, W) => {
   const rows = D.hour, H = 250, m = { l: 36, r: 10, t: 18, b: 30 };
   const s = svgIn(host, W, H, "Share of bus-polls late and early by hour of day");
