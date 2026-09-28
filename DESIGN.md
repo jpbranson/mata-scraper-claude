@@ -148,16 +148,12 @@ clock (:00, :10, :20 …), not 10 s after the last one finished; a cycle takes
 1–4 s, so the old sleep-after-poll loop drifted to 11–14 s apart, and
 history from before the fix has those gaps.
 
-**History — one row per bus per poll.** This is a change from the current
-code, which archives the raw payload separately and writes a position row only
-when something changed. The simpler model wins on every axis:
+**History — one row per bus per poll.**
 
 - Every row represents the same 10 s of bus-time, so plain `AVG()` in SQL is
   already time-weighted. No forward-filling, no "was this bus still in the
   feed?" logic.
 - "Right now" is just the latest poll.
-- The raw archive and the dedupe set (`seen`, `position_key`) are deleted —
-  the normalized row already keeps every field the vendor sends.
 
 Cost (measured): 68 B per bus-poll gzipped, so a 30-bus average over the
 20-hour service day is ~18 MB/day and a full 41-bus day ~24 MB; call it
@@ -650,15 +646,8 @@ Failure modes and the response to each:
 
 ## Implementation plan
 
-Steps 1–4 are done. Each left the project working; net line count went down.
+Steps 1–4 (poller, map, analysis, ops) are done.
 
-1. **Poller.** Read `routes.csv` at startup; write all rows every poll; write
-   `latest.json`; delete raw archive, dedupe set, and the two hardcoded dicts.
-2. **Map.** Add `map.html`; delete `plot_bus_map.py` and `bus_map.html`.
-3. **Analysis.** Add `analysis.sql` with the three queries above.
-4. **Ops.** Add `requirements.txt`, `ops/setup.ps1` and `ops/update.ps1`
-   (Task Scheduler), and `.gitignore` entries for generated files. Deploy
-   and let it run.
 5. **After a week of data:** run the queries, sanity-check against personal
    experience of the routes, then decide the open questions below. Started
    early (2026-09-25, on 1.8 days): the open questions are settled on that
