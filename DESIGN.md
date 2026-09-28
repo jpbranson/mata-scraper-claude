@@ -132,7 +132,7 @@ Five files do the work: the poller, its timetable module, the map page,
 the SQL file, and the crosswalk builder. The poller's other two modules,
 `official_feed.py` and `cadavl_detours.py`, only archive. Everything else
 in the repo is optional, a one-off tool (`backfill_replay.py`,
-`backfill_routes.py`, `probe_cadence.py`), one of the two extra views (`strips.html`,
+`backfill_routes.py`), one of the two extra views (`strips.html`,
 `schematic.html`, sharing `transit.js` and `pages.css`, with
 `build_schematic.py` making the schematic's layout), or the findings page
 (`findings_page/`).
@@ -510,12 +510,6 @@ So the log also holds missed-trip notices from the tracker's side.
 Still not drawn on the map. `python cadavl_detours.py --sample refresh.json`
 parses a saved payload into `detours.geojson` and a GTFS-RT alerts feed, if
 a map layer is ever wanted.
-
-### 6. Probes — `probe_cadence.py`
-
-One-off diagnostic: polls fast for a few minutes to measure how often
-positions really change, and cross-checks the speed unit (settled as m/s
-from the archives, so there is nothing to set).
 
 ## Data model
 
