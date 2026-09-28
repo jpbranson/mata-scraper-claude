@@ -58,7 +58,9 @@ def build_segment_index(payload: dict) -> dict[int, dict]:
     tronconsDeviation list is exactly a subset of one itineraire's segments
     (verified — every detour matched a single itineraire at 100%)."""
     index: dict[int, dict] = {}
-    for itinerary in payload["update"][0]["objetsSuppl"]["itineraires"]:
+    # objetsSuppl is null when no line is detoured (since 2026-09-27).
+    suppl = payload["update"][0].get("objetsSuppl") or {}
+    for itinerary in suppl.get("itineraires") or []:
         for seg in itinerary["troncons"]:
             index[seg["idTroncon"]] = {
                 "start": (seg["debut"]["lat"], seg["debut"]["lng"]),
