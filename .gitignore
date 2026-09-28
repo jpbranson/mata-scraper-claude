@@ -5,6 +5,5 @@ __pycache__/
 # generated
 data/
 topo.json
-detours.geojson
 findings_page/snapshot/
 findings_page/out/

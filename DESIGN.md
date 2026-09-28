@@ -507,9 +507,7 @@ waits for the next hour.
 scheduled to arrive at 8:39 PM" sits beside "Route 39 diverted. Stops: …".
 So the log also holds missed-trip notices from the tracker's side.
 
-Still not drawn on the map. `python cadavl_detours.py --sample refresh.json`
-parses a saved payload into `detours.geojson` and a GTFS-RT alerts feed, if
-a map layer is ever wanted.
+Still not drawn on the map.
 
 ## Data model
 

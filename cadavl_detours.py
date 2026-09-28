@@ -1,5 +1,5 @@
 """
-CADAVL /topo/refresh -> detour records + GTFS-Realtime Service Alerts.
+CADAVL /topo/refresh -> detour records.
 
 Despite the name, `refresh` is not a polling-interval endpoint. It is the
 current network-deviation state: which line segments are being bypassed, the
@@ -13,13 +13,10 @@ the tracker's rider messages (/iv/message: "Route 11 Out of service
 Outbound from Thomas & Whitney @ 7:45 PM...") to
 data/detours/dt=YYYY-MM-DD/detours.jsonl.gz whenever they changed, so
 detour impact can be studied later.
-
-    python cadavl_detours.py --sample refresh.json
 """
 
 from __future__ import annotations
 
-import argparse
 import csv
 import gzip
 import json
@@ -28,7 +25,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
-from google.transit import gtfs_realtime_pb2
 
 from cadavl_to_gtfs_rt import BASE, HEADERS, route_id_for
 
@@ -116,24 +112,8 @@ def parse_detours(payload: dict, route_for=route_id_for) -> list[dict]:
     return detours
 
 
-def detours_to_geojson(detours: list[dict]) -> dict:
-    """Drop straight into R via sf::read_sf(), or DuckDB spatial."""
-    return {
-        "type": "FeatureCollection",
-        "features": [
-            {"type": "Feature",
-             "properties": {"route_id": d["route_id"],
-                            "line_internal_id": d["line_internal_id"],
-                            "path_index": i},
-             "geometry": {"type": "LineString", "coordinates": path}}
-            for d in detours for i, path in enumerate(d["detour_paths"])
-            if len(path) > 1
-        ],
-    }
-
-
 # --------------------------------------------------------------------------
-# GTFS-Realtime Service Alerts
+# Rider messages
 # --------------------------------------------------------------------------
 
 def fetch_messages(session: requests.Session) -> list[dict]:
@@ -146,52 +126,6 @@ def fetch_messages(session: requests.Session) -> list[dict]:
     resp = session.get(f"{BASE}/iv/message", headers=HEADERS, timeout=15)
     resp.raise_for_status()
     return resp.json()
-
-
-def messages_by_line(messages: list[dict]) -> dict[int, list[str]]:
-    out: dict[int, list[str]] = {}
-    for msg in messages:
-        text = msg.get("message")
-        if not text:
-            continue
-        for line in msg.get("ligne", []):
-            out.setdefault(line["idLigne"], []).append(text)
-    return out
-
-
-def build_alerts_feed(detours: list[dict], header_time: int,
-                      texts: dict[int, list[str]] | None = None):
-    """Structural detour data from /topo/refresh, with rider-facing text
-    from /iv/message when supplied."""
-    feed = gtfs_realtime_pb2.FeedMessage()
-    feed.header.gtfs_realtime_version = "2.0"
-    feed.header.incrementality = gtfs_realtime_pb2.FeedHeader.FULL_DATASET
-    feed.header.timestamp = header_time
-
-    for d in detours:
-        entity = feed.entity.add()
-        entity.id = f"detour-{d['line_internal_id']}"
-        alert = entity.alert
-        alert.effect = gtfs_realtime_pb2.Alert.DETOUR
-        alert.cause = gtfs_realtime_pb2.Alert.UNKNOWN_CAUSE
-
-        informed = alert.informed_entity.add()
-        informed.route_id = d["route_id"]
-
-        for text in (texts or {}).get(d["line_internal_id"], []):
-            translation = alert.description_text.translation.add()
-            translation.text = text
-            translation.language = "en"
-
-        for stop_id in d["affected_stop_ids"]:
-            # CADAVL stop IDs, not GTFS stop_ids — same crosswalk problem as
-            # routes. These are the same IDs the horaires/pta/<id> endpoint
-            # uses, so that endpoint is the way to resolve them.
-            stop_entity = alert.informed_entity.add()
-            stop_entity.route_id = d["route_id"]
-            stop_entity.stop_id = f"cadavl:{stop_id}"
-
-    return feed
 
 
 # --------------------------------------------------------------------------
@@ -239,31 +173,3 @@ class DetourLog:
         path.parent.mkdir(parents=True, exist_ok=True)
         with gzip.open(path, "at", encoding="utf-8") as fh:
             fh.write(json.dumps({"fetched_at": now, **state}, separators=(",", ":")) + "\n")
-
-
-# --------------------------------------------------------------------------
-
-def run_sample(path: str) -> None:
-    payload = json.loads(Path(path).read_text())
-    detours = parse_detours(payload)
-    now = int(time.time())
-
-    print(f"{len(detours)} lines on detour")
-    for d in detours:
-        print(f"  {d['route_id']}: {len(d['bypassed_segment_ids'])} segments "
-              f"bypassed, {len(d['affected_stop_ids'])} stops affected, "
-              f"{len(d['detour_paths'])} detour path(s)")
-
-    gj = detours_to_geojson(detours)
-    Path("detours.geojson").write_text(json.dumps(gj))
-    print(f"\nwrote detours.geojson: {len(gj['features'])} linestrings")
-
-    feed = build_alerts_feed(detours, now)
-    print(f"alerts feed: {len(feed.entity)} alerts, "
-          f"{len(feed.SerializeToString())} bytes")
-
-
-if __name__ == "__main__":
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--sample", required=True)
-    run_sample(ap.parse_args().sample)
