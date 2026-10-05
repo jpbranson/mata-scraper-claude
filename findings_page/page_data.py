@@ -1,5 +1,6 @@
-"""Everything the findings page draws, and every number FINDINGS.md quotes,
-from one copy of data/ (made by snapshot.py; never the live files).
+"""Everything the findings page draws, and every number the written
+findings (knowledge/findings/) quote, from one copy of data/ (made by
+snapshot.py; never the live files).
 Writes out/page_data.json (for the page) and out/numbers.txt (for the text).
 
     .venv\\Scripts\\python findings_page\\page_data.py [SNAPSHOT_DIR]
@@ -45,7 +46,7 @@ def r1(x, n=1):
 
 
 D = {}          # page data
-N = []          # numbers for FINDINGS.md, as text lines
+N = []          # numbers for knowledge/findings/, as text lines
 
 
 def note(*a):

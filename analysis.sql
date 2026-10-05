@@ -1,7 +1,7 @@
--- Questions from DESIGN.md and QUESTIONS.md, over data/.
+-- Questions from knowledge/questions/, over data/.
 -- Run from the repo root:  duckdb < analysis.sql   (all of it takes about a
 -- minute; every query stands alone after the views, so copy out the one
--- you want). Each query is tagged [..]; FINDINGS.md quotes them by tag.
+-- you want). Each query is tagged [..]; knowledge/findings/ cites them by tag.
 
 -- ============================================================ views
 
@@ -193,7 +193,7 @@ LEFT JOIN ran r ON r.day = t.day AND r.trip = t.trip
 LEFT JOIN canceled c ON c.day = t.day AND c.trip = t.trip
 WHERE t.due < (SELECT max(observed_at) FROM pos) - 1800;
 
--- ============================================================ the three questions (DESIGN.md)
+-- ============================================================ the three questions (knowledge/project.md)
 
 -- [Q1] 1. Which routes constantly run behind?
 -- The usual on-time window is at most 1 min early and 5 min late. The
@@ -228,7 +228,7 @@ FROM (SELECT unnest(vehicles, recursive := true)
       FROM read_json_auto('data/latest.json'))
 WHERE unchanged_polls < 30;
 
--- ============================================================ open questions (DESIGN.md)
+-- ============================================================ open questions (knowledge/decisions/)
 
 -- [GPS] Whose tracker drops out? Share of each bus's rows that were ghosts.
 SELECT p.equipment_no,
@@ -242,7 +242,7 @@ HAVING count(g.vehicle_id) > 0
 ORDER BY ghost_share DESC
 LIMIT 15;
 
--- ============================================================ QUESTIONS.md 1: delay
+-- ============================================================ knowledge/questions/ 1: delay
 
 -- [WHERE] Where along a route delay builds up. For each stop, the delay a
 -- bus gained since the previous stop logged on its trip (within 15 min),
@@ -312,7 +312,7 @@ GROUP BY ALL HAVING count(*) >= 15
 ORDER BY share_early DESC
 LIMIT 15;
 
--- ============================================================ QUESTIONS.md 2: ridership and crowding
+-- ============================================================ knowledge/questions/ 2: ridership and crowding
 
 -- [LOAD] Peak loads by route: riders on board (load % / 2) over its
 -- bus-polls, and its fullest hour on average. 40 riders fill a 40-ft
@@ -388,7 +388,7 @@ FROM d WHERE stop IS NOT NULL AND gap <= 30
 GROUP BY stop ORDER BY on_per_day DESC
 LIMIT 20;
 
--- ============================================================ QUESTIONS.md 3: service delivered vs promised
+-- ============================================================ knowledge/questions/ 3: service delivered vs promised
 
 -- [HEADWAY] Bunching: are the buses that run evenly spaced? For each two
 -- buses in a row at a stop, the time between them against what the
@@ -475,7 +475,7 @@ GROUP BY ALL HAVING count(*) >= 20 AND avg(m) >= 300
 ORDER BY mph
 LIMIT 20;
 
--- ============================================================ QUESTIONS.md 4: MATA's official feed
+-- ============================================================ knowledge/questions/ 4: MATA's official feed
 
 -- [MISSED] Trips that never ran, by route and day. Most were never marked
 -- canceled; MATA's alerts ("Route 1 is not running from William Hudson at
@@ -591,7 +591,7 @@ SELECT coalesce(s.route, 'all') AS route, count(*) AS trips,
 FROM sat s LEFT JOIN start d USING (day, trip)
 GROUP BY ROLLUP (s.route) ORDER BY trips DESC;
 
--- ============================================================ QUESTIONS.md 5
+-- ============================================================ knowledge/questions/ 5
 
 -- [STOP_WAIT] What riders get, missed trips included: turn up at a
 -- timepoint (mid-route; line ends are in [DEPART]) 2 minutes before the
