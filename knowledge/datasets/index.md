@@ -4,7 +4,7 @@
 * [Live snapshot (latest.json)](latest-snapshot.md) - The current poll's rows plus each bus's recent trail, rewritten atomically every 10 s; what the pages and the "right now" query read.
 * [Replay frames](replay-frames.md) - One compact frame of every bus each 30 s, one file per local day; drives the pages' replay scrubber and trails.
 * [Saved timetables (data/schedule)](schedule-files.md) - Each service day's timetable as the pages need it, per stop and per route with its stop patterns; the only record of past days' timetables.
-* [Arrivals log](arrivals-log.md) - Each time a bus served a stop, with the trip it was matched to and its delay, split by day and route; ~40k a day.
+* [Arrivals log](arrivals-log.md) - Each time a bus served a stop, with the trip it was matched to and its delay, split by day and route; ~42k a weekday.
 * [Official archive - vehicle positions](official-vehicles.md) - MATA's official GTFS-RT vehicle positions, one row per bus per 30 s snapshot, with trip IDs and report times the tracker lacks; from 2026-09-25.
 * [Official archive - trip updates](official-trip-updates.md) - MATA's official GTFS-RT trip updates every 5 minutes, with per-stop predictions and cancelled trips; from 2026-09-25.
 * [Official archive - alerts](official-alerts.md) - MATA's official GTFS-RT rider alerts, one row each time the set of alerts changed; from 2026-09-25.

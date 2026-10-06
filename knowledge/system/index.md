@@ -21,4 +21,4 @@
 # Analysis
 
 * [Analysis SQL](analysis-sql.md) - analysis.sql, one DuckDB file of views over everything in data/ and a tagged query per question; the findings cite its queries by tag.
-* [Findings page](findings-page.md) - findings_page/ builds "Memphis Buses, Measured", the findings as one page of charts (inline SVG, no libraries) published as a claude.ai artifact, from one copy of data/.
+* [Findings page](findings-page.md) - findings_page/ builds "Memphis Buses, Measured", the findings as one page of charts (inline SVG, no libraries) published as a claude.ai artifact, from one copy of data/ made by snapshot.py (12 days since version 4).

@@ -3,7 +3,7 @@ type: Question
 title: How many people are riding right now?
 description: Core question 3, counting buses in service and riders on board from the latest poll (answered).
 tags: [core, ridership, load]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:05:00Z }
 answer_status: answered
 sources:
   - id: design-md
@@ -32,4 +32,6 @@ polls. The load % is riders out of 50 on every vehicle
 
 # Status
 
-Answered: [riders right now](../findings/riders-now.md).
+Answered: `[Q3]`, in [riders right now](../findings/riders-now.md). Since
+2026-10-05 it also works after service, when the latest poll has no
+vehicles (0 buses, 0 riders).

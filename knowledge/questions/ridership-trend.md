@@ -1,9 +1,9 @@
 ---
 type: Question
 title: How does ridership vary by day of week, weather and events?
-description: Daily rider-minutes as one trend line, where games and storms would show as spikes or dips (per-day totals answered; day of week, weather and events wait for weeks of data).
+description: Daily rider-minutes as one trend line, where games and storms would show as spikes or dips (per-day totals and weekdays against weekends answered on 12 days; one weekday against another, weather and events wait for weeks of data).
 tags: [ridership]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:05:00Z }
 answer_status: partial
 sources:
   - id: questions-md
@@ -29,7 +29,8 @@ events also need outside data.
 # Status
 
 Partial. Riding per day (rider-hours, peak on board, boardings) is answered
-for Thursday and Friday: `[RIDERS_DAY]`, in
-[riders per day](../findings/riders-per-day.md). Day of week needs weeks of
-data; weather and events need weeks plus outside data. `[RIDERS_DAY]` is
-ready for it.
+on 12 days (8 weekdays, 2 Saturdays, 2 Sundays), with weekdays against
+Saturdays and Sundays: `[RIDERS_DAY]`, in
+[riders per day](../findings/riders-per-day.md). Comparing one weekday with
+another needs weeks of data (one or two of each so far); weather and events
+need weeks plus outside data. `[RIDERS_DAY]` is ready for it.

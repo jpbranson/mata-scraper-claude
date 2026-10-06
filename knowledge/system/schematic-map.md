@@ -4,8 +4,11 @@ title: Schematic map
 description: schematic.html draws the whole network as a subway map from schematic.json (laid out by LOOM via build_schematic.py), with live or replayed buses sliding along their own lanes and load shown as a band.
 resource: ../../schematic.html
 tags: [map, load]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:01:00Z }
 sources:
+  - id: schematic-json
+    resource: ../../schematic.json
+    title: schematic.json (built, nodes, stations)
   - id: design-md
     resource: https://github.com/jpbranson/mata-scraper-claude/blob/2a1b9ab/DESIGN.md
     title: DESIGN.md at 2a1b9ab
@@ -29,7 +32,9 @@ The chips, bottom bar and bus placement are the [shared page
 code](transit-js.md).
 
 - Stations are the timetable's timepoints, merged where LOOM merged them
-  (246 → 143); segments are at 45°/90°.
+  (the committed `schematic.json`, from 2026-09-24, maps 244
+  timepoint codes onto 142 stations); segments are at
+  45°/90°.[^schematic-json]
 - Routes that share a street run as parallel lanes in LOOM's
   crossing-minimising order.
 - Lines are one neutral ink so color stays with the buses; route numbers
@@ -67,3 +72,4 @@ Freiburg: `gtfs2graph | topo | loom | octi`), cut to timepoints first.
   matter, since routes are keyed by number and stops by code.
 
 [^loom]: LOOM (University of Freiburg)
+[^schematic-json]: schematic.json (built, nodes, stations)

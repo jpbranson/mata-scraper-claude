@@ -1,9 +1,9 @@
 ---
 type: Question
 title: Are the countdowns riders see honest?
-description: How MATA's official arrival predictions compare with when the bus actually came, by how far ahead they were made (answered on one day of official data).
+description: How MATA's official arrival predictions compare with when the bus actually came, by how far ahead they were made (answered on 11 days of official data).
 tags: [official-feed]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:05:00Z }
 answer_status: answered
 sources:
   - id: questions-md
@@ -33,5 +33,5 @@ The [official trip updates](../datasets/official-trip-updates.md) and the
 
 # Status
 
-Answered on Friday's official data: `[PREDICT]`, in
-[countdowns](../findings/countdowns.md).
+Answered on 11 days of official data, Fri 09-25 to Mon 10-05 (2.7 million
+predictions): `[PREDICT]`, in [countdowns](../findings/countdowns.md).

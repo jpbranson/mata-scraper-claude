@@ -4,7 +4,7 @@ title: Replay frames
 description: One compact frame of every bus each 30 s, one file per local day; drives the pages' replay scrubber and trails.
 resource: ../../data/replay/
 tags: [tracker, map]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:05:00Z }
 sources:
   - id: design-md
     resource: https://github.com/jpbranson/mata-scraper-claude/blob/2a1b9ab/DESIGN.md
@@ -13,12 +13,17 @@ sources:
   - id: poller-code
     resource: ../../cadavl_to_gtfs_rt.py
     title: cadavl_to_gtfs_rt.py (replay_frame)
+  - id: replay-listing
+    resource: ../../data/replay/
+    title: File sizes in data/replay, listed 2026-10-05 22:51 CDT
 ---
 
 # Layout
 
 `data/replay/<local day>.jsonl`. Every third poll (30 s) the
-[poller](../system/poller.md) appends one line. Not in git.
+[poller](../system/poller.md) appends one line, from 04:00 to midnight,
+including `"v": []` frames when no bus is out: ~2,400 frames a day. Not in
+git. Files exist from 2026-09-23 (rebuilt from the history).[^replay-listing]
 
 # Schema
 
@@ -35,7 +40,9 @@ stop pattern; older frames stop at `unchanged_polls` and still load.
 
 # Size
 
-~110 B per bus per frame, ~7 MB for a full day (~2.5 GB/year).
+~100 B per bus per frame. Measured 2026-09-26 to 10-04: 7.2–7.8 MB a
+weekday, 5.4 MB a Saturday, 3.1–3.3 MB a Sunday; about 2.4 GB a year, 76 MB
+so far.[^replay-listing]
 
 # Read by
 
@@ -53,3 +60,4 @@ replay existed, after any gap, or to bring old frames up to the current
 format. See [backfill tools](../system/backfill-tools.md).
 
 [^poller-code]: cadavl_to_gtfs_rt.py (replay_frame)
+[^replay-listing]: File sizes in data/replay, listed 2026-10-05 22:51 CDT

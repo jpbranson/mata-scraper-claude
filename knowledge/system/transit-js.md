@@ -4,7 +4,7 @@ title: Shared page code
 description: transit.js and pages.css, shared by the strips and schematic pages (and helpers the map uses) - page links, route chips, the replay bottom bar, and placing a bus along its route's stop pattern.
 resource: ../../transit.js
 tags: [map, replay]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:01:00Z }
 sources:
   - id: design-md
     resource: https://github.com/jpbranson/mata-scraper-claude/blob/2a1b9ab/DESIGN.md
@@ -13,6 +13,9 @@ sources:
   - id: transit-code
     resource: ../../transit.js
     title: transit.js
+  - id: map-code
+    resource: ../../map.html
+    title: map.html (its script after transit.js: delayText, the replay bar)
 ---
 
 # What the two extra views share
@@ -27,8 +30,12 @@ are two more views of the same data as the [map](live-map.md), each with:
   picker, replaying the same [`data/replay/<day>.jsonl`](../datasets/replay-frames.md)
   frames (`transit.js`, `timeline`).
 
-Styles are in `pages.css`. `map.html` uses `transit.js`'s helpers instead of
-its own copies. Delay colors are the map's tiers.
+Styles are in `pages.css`. `map.html` loads `transit.js` too and uses its
+constants and helpers (the delay tiers, `FRAME_S`, `SPEEDS`), with two
+exceptions: it keeps its own replay code rather than `timeline`, and its
+own `delayText`, which overrides the shared one and also says "1h+ off
+schedule" for a capped delay stored as 0 by pollers before the parse
+fix.[^map-code] Delay colors are the map's tiers.
 
 # Replay needs a saved timetable
 
@@ -48,3 +55,5 @@ Both views place a bus along its route's stop pattern the same way:
 
 Replay frames from 2026-09-25 on carry `destination`, `next_stop_name` and
 `equipment_no`, which this needs; older frames still load.
+
+[^map-code]: map.html (its script after transit.js: delayText, the replay bar)

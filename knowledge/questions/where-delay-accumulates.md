@@ -1,9 +1,9 @@
 ---
 type: Question
 title: Where along the route does delay accumulate?
-description: Which stops on each route add delay, pinpointing the intersection or segment causing it (answered on 1.8 days).
+description: Which stops on each route add delay, pinpointing the intersection or segment causing it (answered on 12 days).
 tags: [delay]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:05:00Z }
 answer_status: answered
 sources:
   - id: questions-md
@@ -33,5 +33,6 @@ view, line ends left out).
 
 # Status
 
-Answered on 1.8 days: `[WHERE]`, delay gained per stop in bus-minutes per
-day, in [where delay builds up](../findings/where-delay-builds.md).
+Answered on 12 days (8 weekdays, 2 Saturdays, 2 Sundays): `[WHERE]`, delay
+gained per stop in bus-minutes per day, in
+[where delay builds up](../findings/where-delay-builds.md).

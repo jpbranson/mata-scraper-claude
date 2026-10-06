@@ -4,7 +4,7 @@ title: Running it
 description: Install, update and backfill the always-on Windows home machine that runs the poller and the map server as two scheduled tasks.
 resource: ../../ops/setup.ps1
 tags: [ops]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:39:00Z }
 sources:
   - id: design-md
     resource: https://github.com/jpbranson/mata-scraper-claude/blob/2a1b9ab/DESIGN.md
@@ -19,6 +19,12 @@ sources:
   - id: backfill-ps1
     resource: ../../ops/backfill.ps1
     title: ops/backfill.ps1
+  - id: data-sizes
+    resource: ../../data/
+    title: data/ folder sizes, 2026-09-28 to 2026-10-04 (read-only du)
+  - id: gitignore
+    resource: ../../.gitignore
+    title: .gitignore
 ---
 
 # The machine
@@ -28,9 +34,11 @@ Everything runs natively (Python, `http.server`, DuckDB); only "keep it
 running" is Windows-specific, and Task Scheduler does that.
 
 Needs are tiny: one 12 KB request every 10 s (plus the official feed's two
-of ~2 KB, ~120 KB every 5 minutes, and the detour check's ~150 KB an hour),
-~40–55 MB/day of disk (history, replay frames, official archive; the detour
-log adds a few KB).
+of ~2 KB, ~120 KB every 5 minutes, and the detour check's ~150 KB an hour).
+Disk, measured 2026-09-28 to 2026-10-04: ~43 MB a weekday (history 15–17.5
+MB, official archive 12–14.5, replay frames ~7.5, arrivals ~3.8, saved
+timetable ~1.1), ~34 MB on the Saturday and ~21 MB on the Sunday; the
+detour log adds 4–107 KB a day.[^data-sizes]
 
 - The machine's clock is already Central time, so the service-hours check
   needs no time-zone setting.
@@ -78,11 +86,14 @@ It pauses the poller, runs `backfill_routes.py` (every history file) and
 `backfill_replay.py`, and starts the poller again ([backfill
 tools](../system/backfill-tools.md)).
 
+Any day works: past days are matched to the timetable saved that day
+([backfill tools](../system/backfill-tools.md)).
+
 # Analysis on Windows
 
-Download the DuckDB CLI (`duckdb.exe`, a single file) and run
-`Get-Content analysis.sql | .\duckdb.exe` from the repo folder (see
-[analysis SQL](../system/analysis-sql.md)), on a copy of the data.
+Run [`analysis.sql`](../system/analysis-sql.md) from inside a copy of the
+data made by `findings_page\snapshot.py`, with the DuckDB CLI
+(`duckdb.exe`, a single file) or the venv's Python `duckdb`.
 
 # What git tracks
 
@@ -91,8 +102,18 @@ Code, the crosswalk outputs ([`routes.csv`](../datasets/routes-csv.md),
 [`network.geojson`](../datasets/network-geojson.md)),
 [`schematic.json`](../datasets/schematic-json.md),
 [`vehicules.json`](../datasets/sample-payload.md) (the sample payload for
-`--sample`), and this knowledge bundle. `data/`, the raw `topo.json`,
-`findings_page/snapshot/` and `findings_page/out/` are ignored.
+`--sample`), and this knowledge bundle. `data/`, the raw `topo.json`, the
+copies of `data/` under `findings_page/snapshot*/` and `findings_page/out/`
+are ignored, as are `.venv/` and `__pycache__/`.[^gitignore]
+
+The poller rewrites the crosswalk files in the working copy when MATA
+renumbers its lines, and they stay modified until someone commits them
+(the 2026-09-30 rebuild, topo version 198282, is uncommitted as of
+2026-10-05). Until then `update.ps1` puts the committed ones back and the
+poller rebuilds again ([failure modes](failure-modes.md)).
+
+[^data-sizes]: data/ folder sizes, 2026-09-28 to 2026-10-04 (read-only du)
+[^gitignore]: .gitignore
 
 Away from home: [remote access](remote-access.md). When something breaks:
 [failure modes](failure-modes.md).

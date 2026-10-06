@@ -1,9 +1,9 @@
 ---
 type: Question
 title: Where and when are buses slow?
-description: Speed by route segment and hour, showing where bus lanes or signal priority would help (answered on 1.8 days).
+description: Speed by route segment and hour, showing where bus lanes or signal priority would help (answered on 12 days).
 tags: [speed]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:05:55Z }
 answer_status: answered
 sources:
   - id: questions-md
@@ -25,6 +25,9 @@ the [arrivals log](../datasets/arrivals-log.md).
 
 # Status
 
-Answered on 1.8 days: `[SPEED]` (by route, all day and at the peaks) and
-`[SPEED_SLOW]` (the slowest stop-to-stop stretches of 300 m+), in
-[speed](../findings/speed.md).
+Answered on 12 days (8 weekdays, 2 Saturdays, 2 Sundays): `[SPEED]` (by
+route, all day and at the peaks) and `[SPEED_SLOW]` (the slowest
+stop-to-stop stretches of 300 m+), in [speed](../findings/speed.md).
+`[SPEED_SLOW]` measures straight-line distance, which misreads stretches
+where the route doesn't run straight; the finding measures along the
+route.

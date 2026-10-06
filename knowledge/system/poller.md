@@ -4,7 +4,7 @@ title: Poller
 description: cadavl_to_gtfs_rt.py, the one long-running process; every 10 s during service hours it fetches the tracker's vehicles and writes the history, the snapshot, the replay frames and a GTFS-RT feed, and drives the timetable, official-feed and detour modules.
 resource: ../../cadavl_to_gtfs_rt.py
 tags: [tracker, poller]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:01:00Z }
 sources:
   - id: design-md
     resource: https://github.com/jpbranson/mata-scraper-claude/blob/2a1b9ab/DESIGN.md
@@ -17,6 +17,12 @@ sources:
   - id: poller-code
     resource: ../../cadavl_to_gtfs_rt.py
     title: cadavl_to_gtfs_rt.py
+  - id: copy-2026-10-05
+    resource: ../../findings_page/snapshot-2026-10-05/
+    title: Copy of data/ taken 2026-10-05 22:37 (gaps between stored polls)
+  - id: poller-log
+    resource: ../../data/poller.log
+    title: data/poller.log, 2026-09-30 04:00 crosswalk rebuild (read-only grep)
 ---
 
 # Cycle
@@ -38,14 +44,42 @@ Every row represents the same 10 s of bus-time, so plain `AVG()` in SQL is
 already time-weighted: no forward-filling, no "was this bus still in the
 feed?" logic. "Right now" is just the latest poll.
 
-Each poll then hands off to three modules, each in its own `try/except` so a
+Each poll also hands off to three modules, each in its own `try/except` so a
 failure is logged and never costs a poll:
 
 - [timetable and arrivals](timetable-and-arrivals.md) (`schedule.py`): trip
-  and arrival matching, every poll;
+  and arrival matching, every poll, before the history is written, so each
+  row carries its `trip_id`;
 - [official feed archiver](official-feed-archiver.md) (`official_feed.py`):
-  every poll;
-- [detour logger](detour-logger.md) (`cadavl_detours.py`): hourly.
+  every poll, after the outputs, so a slow official feed never delays
+  `latest.json`;
+- [detour logger](detour-logger.md) (`cadavl_detours.py`): hourly, last.
+
+The order within a poll: fetch, normalize, timetable, history, replay
+frame, `latest.json`, `vehicle_positions.pb`, the log line, official feed,
+detours.[^poller-code]
+
+Outside service hours it polls nothing and checks the clock every 5
+minutes, so `latest.json` keeps the 23:59:50 poll overnight (usually an
+empty vehicle list).
+
+# When a poll fails
+
+A request error on `/topo/vehicules` (timeout, 5xx, connection reset) or an
+`OSError` while writing logs `poll failed: ...` and drops the rest of that
+poll, the official-feed and detour steps included; the next tick tries
+again.[^poller-code]
+
+- The `OSError` case is Windows refusing to replace `latest.json`
+  (`[WinError 5] Access is denied`), which the code puts down to
+  `http.server` having it open. By then the history rows and the replay
+  frame are written, so only `latest.json` (one poll old),
+  `vehicle_positions.pb` and that poll's official and detour steps are
+  missed.
+- The vendor request times out after 10 s, past the next tick, so a timeout
+  costs two ticks.
+
+How often each has happened: [failure modes](../operations/failure-modes.md).
 
 # Fixed 10 s clock
 
@@ -53,7 +87,10 @@ Cycles start on a fixed 10 s clock (:00, :10, :20 …), not 10 s after the
 last one finished. A cycle takes 1–4 s, so the old sleep-after-poll loop
 drifted to 11–14 s apart, and history from before the fix has those gaps.
 The fix went live at 2026-09-25 20:12:38 CDT; afterwards 379 of 380 stored
-polls were on the 10 s clock (the exception was a restart).
+polls were on the 10 s clock (the exception was a restart). From 2026-09-26
+to 2026-10-05 every gap between stored polls is a multiple of 10
+s.[^copy-2026-10-05] A poll that overruns its tick (a 10 s timeout, a
+crosswalk rebuild) skips the next tick rather than crowding it.
 
 # Route mapping and self-repair
 
@@ -65,10 +102,15 @@ polls were on the 10 s clock (the exception was a restart).
   moved past the version recorded in
   [`network.geojson`](../datasets/network-geojson.md) (`topo_version`), it
   rebuilds the crosswalk ([`build_crosswalk.refresh`](crosswalk-builder.md),
-  a ~28 MB download) and reloads, so a renumbering fixes itself within a
-  poll or two.
-- Rows from before the rebuild keep `cadavl:<id>`;
-  [`backfill_routes.py`](backfill-tools.md) remaps them later.
+  a ~28 MB download), reloads it, re-reads the same poll with it, and has
+  `schedule.py` reload the timetable, since stop names may have moved. So a
+  renumbering fixes itself on the poll that first sees it, as on 2026-09-30
+  04:00 (every line ID changed, rebuilt in 7 s); no `cadavl:<id>` row was
+  stored.[^poller-log]
+- If the check finds nothing new or the rebuild fails (`crosswalk refresh
+  failed: ...`), the next check waits 15 minutes, and rows logged in
+  between keep `cadavl:<id>`; [`backfill_routes.py`](backfill-tools.md)
+  remaps them later.
 
 # Helpers
 
@@ -91,4 +133,10 @@ tool ([failure modes](../operations/failure-modes.md)).
 # Log
 
 Output goes to [`data\poller.log`](../datasets/poller-log.md), each line
-stamped with the local date and time (live since 2026-09-25 20:12:38).
+stamped with the local date and time (live since 2026-09-25 20:12:38). The
+stamp is when the line was printed, at the end of the poll, so it can trail
+the tick by a few seconds.
+
+[^poller-code]: cadavl_to_gtfs_rt.py
+[^copy-2026-10-05]: Copy of data/ taken 2026-10-05 22:37 (gaps between stored polls)
+[^poller-log]: data/poller.log, 2026-09-30 04:00 crosswalk rebuild (read-only grep)

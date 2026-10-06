@@ -11,4 +11,4 @@
 # MATA's GTFS feeds
 
 * [MATA GTFS timetable (GTFS_MATA.zip)](gtfs-timetable.md) - MATA's published timetable from the tracker's vendor, rebuilt nightly; it lines up exactly with the tracker and is the base for trip matching, stop schedules and the schematic.
-* [MATA official GTFS-Realtime feed](official-gtfs-rt.md) - MATA's own GTFS-RT vehicle positions, trip updates and alerts from the tracker's vendor; it has trip IDs, report times and cancellations the tracker lacks, but no delay and staler positions.
+* [MATA official GTFS-Realtime feed](official-gtfs-rt.md) - MATA's own GTFS-RT vehicle positions, trip updates and alerts from the tracker's vendor; it has trip IDs, report times and cancellations the tracker lacks, but no delay, and positions only every 30 s.

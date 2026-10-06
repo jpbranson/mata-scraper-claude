@@ -3,14 +3,17 @@ type: Decision
 title: "Late threshold: 5 minutes"
 description: On time means at most 1 minute early and 5 minutes late, the usual window, because MATA's own window isn't published.
 tags: [delay, on-time]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:05:00Z }
 sources:
   - id: q-q1
     resource: ../../analysis.sql
     title: analysis.sql [Q1]
   - id: snapshot
-    resource: ../findings/snapshot-2026-09-25.md
-    title: Data snapshot, Fri 2026-09-25 20:21
+    resource: ../findings/snapshot-2026-10-05.md
+    title: Data snapshot, Mon 2026-10-05 22:37
+  - id: one-off
+    resource: "One-off DuckDB queries over findings_page/snapshot-2026-10-05, 2026-10-05 (not kept)"
+    title: One-off queries, 2026-10-05
   - id: departures
     resource: ../findings/departures.md
     title: Departures from the first stop
@@ -33,10 +36,6 @@ sources:
     resource: https://github.com/jpbranson/mata-scraper-claude/blob/2a1b9ab/DESIGN.md
     title: DESIGN.md at 2a1b9ab
     last_modified: 2026-09-28T01:29:38Z
-  - id: findings-md
-    resource: https://github.com/jpbranson/mata-scraper-claude/blob/513d93a/FINDINGS.md
-    title: FINDINGS.md at 513d93a
-    last_modified: 2026-09-26T02:35:29Z
 ---
 
 # Decision
@@ -60,16 +59,19 @@ definition turns up, change the two numbers in `[Q1]` of
   2012 Short Range Transit Plan,[^srtp-2012] states the minutes; the data
   hub's "Data Dictionary" PDF might,[^mata-otp-dictionary] but its host was
   refused in the browser.
-- **The vendor's "on time" spans ±1 minute.** In 351k rows it never says
-  "1 min"; the smallest non-zero values are ±2 min (see the
-  [tracker's known limits](../feeds/tracker-vehicles.md)).
-- **On that window:**[^snapshot]
-  - 73% of bus-polls on time (18% late, 9% early);
-  - 75% of departures from mid-route timepoints (17% late, 8% early);
-  - 60% of departures from a trip's first stop, from MATA's feed (59% on
-    the earlier copy first used).[^departures] That last is the number
-    nearest MATA's own figures (54–65% in 2021–22), which suggests MATA
-    measures departures.
+- **The vendor's "on time" spans ±1 minute.** In 2.2 million rows over
+  12 days it never says "1 min"; the smallest non-zero values are ±2 min
+  (see the [tracker's known limits](../feeds/tracker-vehicles.md)).[^one-off]
+- **On that window, over 12 days (8 weekdays, 2 Saturdays, 2
+  Sundays):**[^snapshot][^one-off]
+  - 74% of bus-polls on time (17% late, 9% early); weekdays 74% (18%
+    late), Sundays 81%;
+  - 75% of departures from mid-route timepoints (16% late, 8% early);
+  - 60% of departures from a trip's first stop, from MATA's feed over 11
+    days (58% on weekdays, 75% on Sundays; 60% on Fri 09-25, the one day
+    first measured).[^departures] That last is still the
+    number nearest MATA's own figures (54–65% in 2021–22), which suggests
+    MATA measures departures. 12 days don't change the decision.
 - Early running is real, at some routes and timepoints much more than
   others: [early running](../findings/early-running.md).
 
@@ -79,7 +81,8 @@ can open it (or ask MATA), and the window isn't "≤ 1 min early, ≤ 5 min
 late", change the two numbers in `[Q1]`.
 
 [^q-q1]: analysis.sql [Q1]
-[^snapshot]: Data snapshot, Fri 2026-09-25 20:21
+[^snapshot]: Data snapshot, Mon 2026-10-05 22:37
+[^one-off]: One-off queries, 2026-10-05
 [^departures]: Departures from the first stop
 [^mata-otp-hub]: Memphis Open Data Hub: MATA On Time Performance
 [^mata-otp-dictionary]: MATA On Time Performance data dictionary

@@ -4,7 +4,7 @@ title: Tracker vehicles (/topo/vehicules)
 description: Every bus's position, heading, speed, next stop, schedule adherence and passenger load, refreshed every 10 s; the only endpoint polled continuously.
 resource: https://swiv.mata.cadavl.com/SWIV/MATA/proxy/restWS/topo/vehicules
 tags: [tracker, delay, load, gps]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:05:00Z }
 sources:
   - id: design-md
     resource: https://github.com/jpbranson/mata-scraper-claude/blob/2a1b9ab/DESIGN.md
@@ -16,6 +16,15 @@ sources:
   - id: crosswalk-code
     resource: ../../build_crosswalk.py
     title: build_crosswalk.py docstring
+  - id: sample
+    resource: ../../vehicules.json
+    title: Saved /topo/vehicules payload, 2026-09-23 (every field path in its 41 buses)
+  - id: snapshot-1005
+    resource: Measured on findings_page/snapshot-2026-10-05 (copy of data/ taken 2026-10-05 22:37 CDT)
+    title: Measurements on the 2026-10-05 snapshot (positions 2026-09-23 21:38 to 2026-10-05 22:33, GTFS timetable of 2026-10-05)
+  - id: poller-log
+    resource: ../../data/poller.log
+    title: poller.log, crosswalk rebuilds at 2026-09-30 04:00 and 2026-10-02 04:00
 ---
 
 # What it is
@@ -26,7 +35,8 @@ stop, schedule adherence ("4 min late") and passenger load ("30%"). About
 apart, and the server took 0.9–3.4 s to answer.[^poller-code] The
 [poller](../system/poller.md) fetches it every 10 s and stores one
 [position row](../datasets/positions.md) per bus. A saved copy is the
-[sample payload](../datasets/sample-payload.md).
+[sample payload](../datasets/sample-payload.md). After the evening's last
+bus it returns an empty list.
 
 # Schema
 
@@ -48,6 +58,9 @@ apart, and the server took 0.9–3.4 s to answer.[^poller-code] The
 | `conduite.avanceRetard` | `delay_raw`, `delay_seconds`, `delay_capped` | Vendor text, e.g. "4 min late" |
 | `vehiculeLoad` | `occupancy_pct` | e.g. "30%" |
 
+That is the whole payload: the sample's 41 buses have no other
+field.[^sample]
+
 # Known limits
 
 These shape the design, and were confirmed against live traffic. The
@@ -59,19 +72,28 @@ archive, not in our rows.
   tracker that stopped reporting (a "ghost"). `unchanged_polls` counts the
   still polls; how the streak ends tells the two apart (see
   [ghost threshold](../decisions/ghost-threshold.md)).
-- **No trip or block ID.** We know the route and headsign, not which
-  scheduled trip a bus is on; [schedule.py](../system/timetable-and-arrivals.md)
-  infers it, and the official feed's `trip_id` is there to
+- **No trip, block, run or driver.** We know the route and headsign, not
+  which scheduled trip a bus is on or who is driving it;[^sample]
+  [schedule.py](../system/timetable-and-arrivals.md) infers the trip, and
+  the official feed's `trip_id` is there to
   [check it against](../findings/trip-matching.md). Delay is whatever the
   vendor reports (`avanceRetard`), not something we compute. The timetable
   does carry blocks, and a few interline buses between routes 13 and 40
-  (see [GTFS timetable](gtfs-timetable.md)).
-- **Buses leave the feed at layovers.** At the end of a line a bus often
-  drops out of the payload for 5–25 minutes and comes back on its return
-  trip (bus 10015 at Walnut @ Racine: 20:10–20:19). Those gaps are in the
-  history too; they're most of the breaks in the
-  [map's](../system/live-map.md) delay chart. The official feed keeps such a
-  bus, parked at its next trip's first stop.
+  (see [GTFS timetable](gtfs-timetable.md)). Neither feed names the driver
+  ([driver changes](../findings/driver-changes.md)).
+- **Buses leave the feed at layovers.** At the end of a line the tracker
+  drops the bus and brings it back about 5 minutes before its next trip's
+  scheduled start: a median 4.8 min before, and 3–8 min before on 2,981 of
+  3,492 such gaps (2026-09-23 to 10-05).[^snapshot-1005] So the gap is the
+  layover: a median 4–19 min by route, longest on route 42. On routes 07,
+  28 and the trolley (100) buses mostly come back after the next trip was
+  due, so late. These gaps are in the history too; they're most of the
+  breaks in the [map's](../system/live-map.md) delay chart. The official
+  feed keeps such a bus, parked at its next trip's first stop.
+- **Mid-trip, a standing bus almost never drops out.** Of the 4,066 gaps
+  over 2 minutes in a bus's rows while the feed was up, 91 were mid-trip
+  (next stop set, same headsign before and after), and only 19 of those
+  came back within 50 m of where they left.[^snapshot-1005]
 - **Delay is capped.** `"1h+ late"` / `"1h+ early"` mean "at least an hour",
   stored as ±3600 and flagged `delay_capped`. Those rows are usually
   misassigned buses; exclude them. (Pollers until the evening of 2026-09-24
@@ -83,13 +105,15 @@ archive, not in our rows.
   `"2 min late"` and `"2 min early"`. See
   [late threshold](../decisions/late-threshold.md).
 - **Line and stop IDs are opaque and unstable.** Internal `idLigne` (e.g.
-  111302) maps to route "36" only by lookup, and every ID changes when the
-  vendor publishes a new [topo](tracker-topo.md) version, which happened
-  twice in September 2026, days apart (every ID changed between topo
-  versions 198238 and 198256).[^crosswalk-code] Stop codes (`LAMLAPEN`) and
-  route numbers are stable; key everything on those.
-- **Speed is metres per second**, whole numbers (typically 0–21; about 1
-  reading in 1,200 is impossible, up to 347). Settled 2026-09-25: see
+  111394) maps to route "36" only by lookup, and every line and stop ID
+  changes when the vendor publishes a new [topo](tracker-topo.md) version.
+  That happened three times in eight days: topo 198238 (2026-09-23), 198256
+  (2026-09-24) and 198282 (2026-09-30) each renumbered every
+  ID.[^crosswalk-code][^poller-log] Stop codes (`LAMLAPEN`) and route
+  numbers are stable; key everything on those.
+- **Speed is metres per second**, whole numbers (0–21 on 99% of rows; about
+  1 reading in 1,000 is over 40 m/s and impossible, up to 1,542, from
+  2026-09-23 to 10-05).[^snapshot-1005] Settled 2026-09-25: see
   [speed unit](../decisions/speed-unit.md). Not needed for any of the three
   questions.
 - **Load is riders out of 50**, presumably from the bus's automatic
@@ -99,3 +123,6 @@ archive, not in our rows.
 
 [^poller-code]: cadavl_to_gtfs_rt.py (normalize_vehicle, POLL_SECONDS)
 [^crosswalk-code]: build_crosswalk.py docstring
+[^sample]: Saved /topo/vehicules payload, 2026-09-23
+[^snapshot-1005]: Measurements on the 2026-10-05 snapshot
+[^poller-log]: poller.log, crosswalk rebuilds at 2026-09-30 04:00 and 2026-10-02 04:00

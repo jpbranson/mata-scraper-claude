@@ -1,9 +1,9 @@
 ---
 type: Question
 title: How many buses are out, against what the schedule needs?
-description: Buses in service by hour against the trips the timetable has running, since dropped runs never show up as late (answered on 1.8 days).
+description: Buses in service by hour against the trips the timetable has running, since dropped runs never show up as late (answered on 12 days).
 tags: [missed-service]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:05:55Z }
 answer_status: answered
 sources:
   - id: questions-md
@@ -25,5 +25,5 @@ The [tracker history](../datasets/positions.md) and the
 
 # Status
 
-Answered on 1.8 days: `[FLEET]`, in
-[fleet in service](../findings/fleet-in-service.md).
+Answered on 12 days (8 weekdays, 2 Saturdays, 2 Sundays): `[FLEET]`,
+split by day type, in [fleet in service](../findings/fleet-in-service.md).

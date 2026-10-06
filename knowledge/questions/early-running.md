@@ -1,9 +1,9 @@
 ---
 type: Question
 title: Where and how often do buses run early?
-description: Early running, which strands riders and is invisible in on-time percentages (answered on 1.8 days).
+description: Early running, which strands riders and is invisible in on-time percentages (answered on 12 days).
 tags: [delay]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:05:00Z }
 answer_status: answered
 sources:
   - id: questions-md
@@ -24,6 +24,7 @@ come from the [arrivals log](../datasets/arrivals-log.md).
 
 # Status
 
-Answered on 1.8 days: `[EARLY]` (timepoints where buses leave early) and
-`[Q1]`'s `share_early`, in [early running](../findings/early-running.md).
+Answered on 12 days (8 weekdays, 2 Saturdays, 2 Sundays): `[EARLY]`
+(timepoints where buses leave early) and `[Q1]`'s `share_early`, in
+[early running](../findings/early-running.md).
 From the start of a line, see [departures](../findings/departures.md).

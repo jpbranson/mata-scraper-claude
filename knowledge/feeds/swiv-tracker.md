@@ -4,7 +4,7 @@ title: MATA bus tracker (SWIV / CADAVL)
 description: MATA's public bus tracker site, run by the vendor CADAVL, whose unauthenticated JSON endpoints feed the poller, the crosswalk and the detour log.
 resource: https://swiv.mata.cadavl.com/SWIV/MATA
 tags: [tracker]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:05:00Z }
 sources:
   - id: design-md
     resource: https://github.com/jpbranson/mata-scraper-claude/blob/2a1b9ab/DESIGN.md
@@ -39,7 +39,7 @@ The same vendor publishes MATA's [GTFS timetable](gtfs-timetable.md) and its
 | Endpoint | What it is | Size / cadence | Used for |
 |---|---|---|---|
 | [`/topo/vehicules`](tracker-vehicles.md) | Every bus: position, heading, speed, next stop, schedule adherence, passenger load | ~12 KB, refreshes every 10 s | The [poller](../system/poller.md), the only thing hit continuously |
-| [`/topo`](tracker-topo.md) | Full network: 25 lines, ~3,700 stops | ~28 MB, changes rarely | [routes.csv](../datasets/routes-csv.md) / [stops.csv](../datasets/stops-csv.md) crosswalk |
+| [`/topo`](tracker-topo.md) | Full network: 25 lines, 3,762 stops | ~28 MB, changes every few days to weeks (3 new versions 2026-09-23 to 10-05) | [routes.csv](../datasets/routes-csv.md) / [stops.csv](../datasets/stops-csv.md) crosswalk |
 | [`/config/version`](tracker-config-version.md) | Integer that bumps when `/topo` changes | tiny | Knowing when to rebuild the crosswalk |
 | [`/topo/refresh`](tracker-detours.md) | Current detours (bypassed and replacement segments) | ~150–385 KB, changes over days | [Detour log](../datasets/detour-log.md), hourly |
 | [`/iv/message`](tracker-messages.md) | Rider-facing notices: detours, and trips out of service | small | [Detour log](../datasets/detour-log.md), hourly |

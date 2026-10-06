@@ -1,10 +1,10 @@
 ---
 type: Question
 title: Which days are especially bad?
-description: Core question 2, comparing whole service days by how late buses ran (waiting for weeks of data; two weekdays can't say which days are bad).
+description: Core question 2, comparing whole service days by how late buses ran (partial on 12 days; Sundays are the good days, weekdays and Saturdays alike; one weekday against another, weather and events wait for more weeks).
 tags: [core, delay]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
-answer_status: waiting
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:05:00Z }
+answer_status: partial
 sources:
   - id: design-md
     resource: https://github.com/jpbranson/mata-scraper-claude/blob/2a1b9ab/DESIGN.md
@@ -33,7 +33,10 @@ The [tracker history](../datasets/positions.md), over many days.
 
 # Status
 
-Waiting. The query runs ([bad days](../findings/bad-days.md)), but two
-weekdays can't say which days are bad. Weekday vs weekend needs weeks of data;
-the queries for it (`[Q2]`, `[HOUR]` + `dayname`, `[RIDERS_DAY]`) are ready.
-Weather and events: see [ridership trend](ridership-trend.md).
+Partial. Weekday vs weekend is answered on 12 days (8 weekdays, 2
+Saturdays, 2 Sundays): `[Q2]`, in [bad days](../findings/bad-days.md).
+Sundays are the good days; weekdays and Saturdays are alike, and a bad day
+is a few routes' bad day. Still waiting: one weekday against another (one
+or two of each so far) needs several weeks; `[Q2]` and `[HOUR]` + `dayname`
+are ready for it. Weather and events: see
+[ridership trend](ridership-trend.md).

@@ -1,9 +1,9 @@
 ---
 type: Question
 title: What headway do riders actually get?
-description: Time between successive buses at a stop against the timetable's promised frequency (answered on 1.8 days).
+description: Time between successive buses at a stop against the timetable's promised frequency (answered on 12 days).
 tags: [headway]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:05:55Z }
 answer_status: answered
 sources:
   - id: questions-md
@@ -26,6 +26,6 @@ from the [arrivals log](../datasets/arrivals-log.md) against the
 
 # Status
 
-Answered on 1.8 days: `[HEADWAY]`, in
-[headways and bunching](../findings/headways.md). Run per stop, it becomes
-[stop-level waits](stop-waits.md).
+Answered on 12 days (8 weekdays, 2 Saturdays, 2 Sundays): `[HEADWAY]`,
+in [headways and bunching](../findings/headways.md). Run per stop, it
+becomes [stop-level waits](stop-waits.md).

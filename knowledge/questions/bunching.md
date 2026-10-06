@@ -1,9 +1,9 @@
 ---
 type: Question
 title: Do buses bunch?
-description: Whether buses of a route and direction run close together and leave long gaps behind them, the thing riders feel most (answered on 1.8 days).
+description: Whether buses of a route and direction run close together and leave long gaps behind them, the thing riders feel most (answered on 12 days).
 tags: [headway]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:05:55Z }
 answer_status: answered
 sources:
   - id: questions-md
@@ -31,5 +31,5 @@ from the [arrivals log](../datasets/arrivals-log.md) against the
 
 # Status
 
-Answered on 1.8 days: `[HEADWAY]`, in
-[headways and bunching](../findings/headways.md).
+Answered on 12 days (8 weekdays, 2 Saturdays, 2 Sundays): `[HEADWAY]`,
+in [headways and bunching](../findings/headways.md).

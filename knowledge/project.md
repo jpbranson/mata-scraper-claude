@@ -4,12 +4,15 @@ title: MATA bus feed
 description: Continuously record where every MATA (Memphis) bus is, show it on a live map, and keep enough history to answer which routes run behind, which days are bad, and how many people are riding.
 resource: https://github.com/jpbranson/mata-scraper-claude
 tags: [tracker, map, analysis]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:19:00Z }
 sources:
   - id: design-md
     resource: https://github.com/jpbranson/mata-scraper-claude/blob/2a1b9ab/DESIGN.md
     title: DESIGN.md at 2a1b9ab
     last_modified: 2026-09-28T01:29:38Z
+  - id: findings-page
+    resource: system/findings-page.md
+    title: Findings page (the copies of data/)
 ---
 
 # Purpose
@@ -49,8 +52,13 @@ Steps 1–4 (poller, map, analysis, ops) are done.
    threshold](decisions/ghost-threshold.md), [late
    threshold](decisions/late-threshold.md), [speed
    unit](decisions/speed-unit.md)), the question backlog is worked through,
-   results in [findings/](findings/). Still to do: rerun on a full week and
-   the sanity check. Tracked in [next steps](work/next-steps.md).
+   results in [findings/](findings/). On 2026-10-05 the whole of
+   `analysis.sql` was rerun on 12 service days (the [2026-10-05
+   snapshot](findings/snapshot-2026-10-05.md), MATA's own feed from
+   2026-09-25): every finding and the four decisions were refreshed (the
+   decisions stand), and [driver changes](findings/driver-changes.md) was
+   added.[^findings-page] Still to do: the sanity check. Tracked in [next
+   steps](work/next-steps.md).
 
 # Non-goals
 
@@ -63,3 +71,5 @@ Steps 1–4 (poller, map, analysis, ops) are done.
 - Unit tests. The offline `--sample` run against
   [`vehicules.json`](datasets/sample-payload.md) is the regression check; if
   the parser changes, run it.
+
+[^findings-page]: Findings page (the copies of data/)

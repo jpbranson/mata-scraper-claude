@@ -5,5 +5,5 @@
 
 # Playbooks
 
-* [Failure modes](failure-modes.md) - What happens, and what to do, when the vendor, the machine, MATA's routes, the GTFS feed, the official feed or the detour endpoints misbehave.
+* [Failure modes](failure-modes.md) - What happens, and what to do, when the vendor, the machine, MATA's routes, the GTFS feed, the official feed or the detour endpoints misbehave, and how often each has since 2026-09-25.
 * [Working with live data](working-with-live-data.md) - Rules for agents and people working on the repo while the poller runs - analyse a copy of data/, use the repo's .venv Python, test poller changes in a scratch copy, and leave restarting the poller to the human.

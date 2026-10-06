@@ -1,9 +1,9 @@
 ---
 type: Question
 title: How long do riders actually wait at the stop?
-description: Stop-level wait times riders experience, missed trips included, against the timetable's promised gaps (answered on 1.8 days).
+description: Stop-level wait times riders experience, missed trips included, against the timetable's promised gaps (answered on 12 days).
 tags: [headway, missed-service]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:05:55Z }
 answer_status: answered
 sources:
   - id: questions-md
@@ -26,5 +26,5 @@ The [arrivals log](../datasets/arrivals-log.md) and the
 
 # Status
 
-Answered on 1.8 days: `[STOP_WAIT]`, in
-[stop waits](../findings/stop-waits.md).
+Answered on 12 days (8 weekdays, 2 Saturdays, 2 Sundays):
+`[STOP_WAIT]`, in [stop waits](../findings/stop-waits.md).

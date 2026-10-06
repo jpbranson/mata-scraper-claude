@@ -1,9 +1,9 @@
 ---
 type: Question
 title: Which routes constantly run behind?
-description: Core question 1, ranking routes by how often their buses run 5+ minutes late (answered on 1.8 days; week-long rerun and human sanity check pending).
+description: Core question 1, ranking routes by how often their buses run 5+ minutes late (answered on 12 days; human sanity check pending).
 tags: [core, delay]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:05:00Z }
 answer_status: answered
 sources:
   - id: design-md
@@ -39,8 +39,9 @@ The [tracker history](../datasets/positions.md) alone.
 
 # Status
 
-Answered on 1.8 days of data:
-[which routes run behind](../findings/routes-behind.md). Still to do (step 5
-of the [project](../project.md)'s plan): rerun after a full week
-(~2026-10-01), and a human sanity check of the ranking against experience of
-the routes ([next steps](../work/next-steps.md), 3a).
+Answered on 12 days (8 weekdays, 2 Saturdays, 2 Sundays): `[Q1]`, in
+[which routes run behind](../findings/routes-behind.md), with a weekday-only
+ranking beside it. Still to do (step 5 of the [project](../project.md)'s
+plan): a human sanity check of the ranking against experience of the routes
+([next steps](../work/next-steps.md), 3a). Ranking routes on weekends, two
+of each so far, needs more weeks.

@@ -1,9 +1,9 @@
 ---
 type: Question
 title: How full do buses get, by route and hour?
-description: Peak load by route and hour, showing which routes get uncomfortably full and when (answered on 1.8 days).
+description: Peak load by route and hour, showing which routes get uncomfortably full and when (answered on 12 days).
 tags: [load, ridership]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:05:00Z }
 answer_status: answered
 sources:
   - id: questions-md
@@ -26,4 +26,7 @@ The [tracker history](../datasets/positions.md) alone.
 
 # Status
 
-Answered on 1.8 days: `[LOAD]`, in [peak loads](../findings/peak-loads.md).
+Answered on 12 days (8 weekdays, 2 Saturdays, 2 Sundays): `[LOAD]`, in
+[peak loads](../findings/peak-loads.md). The weekday and weekend split and
+the weekday busiest hours come from one-off queries (the same query by day
+type).

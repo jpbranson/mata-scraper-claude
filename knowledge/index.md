@@ -11,7 +11,7 @@ okf_version: "0.2"
 # What we know
 
 * [Questions](questions/) - The three core questions and the backlog beyond them, each with its answer status.
-* [Findings](findings/) - What the recorded data says, one concept per question, all from the 2026-09-25 20:21 snapshot (stale since 2026-10-01).
+* [Findings](findings/) - What the recorded data says, one concept per question, from 12 service days of data to 2026-10-05 (the 2026-10-05 snapshot).
 * [Decisions](decisions/) - Open questions settled from the data (capacity, ghost and late thresholds, speed unit) and how the system is hosted.
 
 # Where the data comes from

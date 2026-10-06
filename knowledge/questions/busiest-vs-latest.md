@@ -1,9 +1,9 @@
 ---
 type: Question
 title: Are the busiest routes the latest routes?
-description: Crowding against delay by route, a hint whether boarding time causes delay (answered on 1.8 days).
+description: Crowding against delay by route, a hint whether boarding time causes delay (answered on 12 days).
 tags: [load, delay]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:05:00Z }
 answer_status: answered
 sources:
   - id: questions-md
@@ -23,5 +23,6 @@ The [tracker history](../datasets/positions.md) alone.
 
 # Status
 
-Answered on 1.8 days: `[LOAD_DELAY]`, in
-[load vs delay](../findings/load-vs-delay.md).
+Answered on 12 days (8 weekdays, 2 Saturdays, 2 Sundays): `[LOAD_DELAY]`,
+in [load vs delay](../findings/load-vs-delay.md). Whether boarding time
+causes the delay, or late buses collect more riders, the data can't tell.

@@ -1,9 +1,9 @@
 ---
 type: Question
 title: How much scheduled service never runs?
-description: The share of scheduled trips that never ran, by route, hour and weekday, which belongs beside which routes run behind (by route and hour answered; by weekday waits for weeks of data).
+description: The share of scheduled trips that never ran, by route, hour and weekday, which belongs beside which routes run behind (by route, hour and weekdays against weekends answered on 12 days; one weekday against another waits for weeks of data).
 tags: [missed-service, official-feed]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:05:55Z }
 answer_status: partial
 sources:
   - id: questions-md
@@ -36,8 +36,9 @@ the [detour log](../datasets/detour-log.md) also hold missed-trip notices.
 
 # Status
 
-Partial. By route and hour, answered on 1.8 days: `[MISSED]` and
-`[MISSED_HOUR]`, in [missed service](../findings/missed-service.md). By
-weekday needs weeks of data. Worked out alongside
-[bunching](bunching.md), because missed trips explained the first headway
-results.
+Partial. Answered on 12 days (8 weekdays, 2 Saturdays, 2 Sundays) by
+route, day, hour and weekdays against weekends: `[MISSED]` and
+`[MISSED_HOUR]`, in [missed service](../findings/missed-service.md).
+Comparing one weekday with another needs weeks of data: there are one or
+two of each so far. Worked out alongside [bunching](bunching.md), because
+missed trips explained the first headway results.

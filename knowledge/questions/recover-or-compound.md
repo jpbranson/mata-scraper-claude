@@ -1,9 +1,9 @@
 ---
 type: Question
 title: Does delay recover or compound?
-description: Whether a bus late at the start of a trip catches up or falls further behind, telling wrong schedules from stuck buses (answered on 1.8 days).
+description: Whether a bus late at the start of a trip catches up or falls further behind, telling wrong schedules from stuck buses (answered on 12 days).
 tags: [delay]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:05:00Z }
 answer_status: answered
 sources:
   - id: questions-md
@@ -35,6 +35,6 @@ out.
 
 # Status
 
-Answered on 1.8 days: `[WHERE_ROUTE]` (delay at a trip's last logged stop
-minus its first), in
+Answered on 12 days (8 weekdays, 2 Saturdays, 2 Sundays): `[WHERE_ROUTE]`
+(delay at a trip's last logged stop minus its first), in
 [where delay builds up](../findings/where-delay-builds.md).

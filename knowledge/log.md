@@ -1,5 +1,71 @@
 # Update log (Central time)
 
+## 2026-10-06
+
+* **Request**: 00:10 — At the user's request, committed and pushed
+  everything from 2026-10-05, including the crosswalk files at topo 198282.
+* **Update**: 00:09 — Findings page version 4, rebuilt on the 12-day copy
+  at the user's request: a route-by-day grid of trips that never ran, a new
+  "Which days are bad" section, weekdays apart from Saturdays and Sundays in
+  the hour, riders and fleet charts, a weekday late column in the route
+  table, slow stretches measured along the route, and every figure in the
+  text from 12 days. `page_data.py` was rewritten for weeks of data (no
+  more `FEED_DAY`); see [findings page](system/findings-page.md).
+
+## 2026-10-05
+
+* **Correction**: 23:39 — At the user's request, `backfill_replay.py` fixed:
+  it now matches each past day's arrivals to the timetable saved that day
+  (`Timetable.saved` in `schedule.py`) instead of today's `gtfs.zip`, which
+  has no service on earlier days, and leaves a day with neither alone.
+  Tested on a copy: 2026-09-29 rebuilt to the poller's 42,036 arrivals byte
+  for byte; see [backfill tools](system/backfill-tools.md).
+* **Update**: 23:20 — At the user's request ("verify that project knowledge
+  is accurate, comprehensive, and up to date"), the whole bundle was checked
+  against the code, `git log`, `poller.log` and the 12-day copy. Every
+  finding, its question's status, and the decisions on capacity, ghosts,
+  lateness and speed were rerun on 12 days (all four decisions stand); the
+  system, operations, feeds and datasets concepts were corrected where the
+  code or data disagreed (among them: the official feed is about as fresh as
+  the tracker, not a minute behind; the vendor renumbered every line and
+  stop on 2026-09-30, topo 198282, and `ops\update.ps1` reverts the
+  uncommitted crosswalk; `backfill_replay.py` would strip trips from past
+  days; measured sizes, failures since 2026-09-25, and the block structure
+  of the timetable). Comments in `official_feed.py`, `cadavl_detours.py`
+  and `cadavl_to_gtfs_rt.py` corrected to match; `--sample` still parses 41
+  buses. What needs the user is in [next steps](work/next-steps.md).
+* **Update**: 23:12 — `analysis.sql` changed where 12 days showed a query
+  misleading: `[WHERE]`, `[HOUR]`, `[Q1]`, `[LOAD]`, `[BOARDINGS]`,
+  `[FLEET]`, `[MISSED]`, `[MISSED_HOUR]`, `[TRIPMATCH]`, `[LAYOVER]`, the
+  `good` view's comment and the header (see
+  [analysis.sql](system/analysis-sql.md)). Earlier (22:48), `[Q3]` fixed:
+  it failed every night once `latest.json` had no vehicles. The whole file
+  runs in about 4 minutes on 12 days.
+* **Update**: 22:52 — Findings page version 3: "Changing drivers" rebuilt
+  from `findings_page/snapshot-2026-10-05/` (same trips, passes and times)
+  instead of the 22:01 scratch copy.
+* **Correction**: 22:42 — At 22:38 a `snapshot.py` run copied the live
+  `data/` into `findings_page/snapshot/`, over the 2026-09-25 20:21 copy the
+  page is built from (an edit to give it a `DEST_DIR` had failed, and the
+  command carried on). Rebuilt by keeping records up to the original's last
+  poll; `page_data.py` on it reproduces `out/page_data.json` and
+  `out/numbers.txt` byte for byte ([snapshot](findings/snapshot-2026-09-25.md)).
+  The live `data/` was only read. `snapshot.py` now takes a `DEST_DIR` and
+  copies `data/detours/` (without it `page_data.py` had failed since
+  2026-09-27); `.gitignore` ignores `findings_page/snapshot*/`.
+* **Creation**: 22:37 — The 12-day copy, `findings_page/snapshot-2026-10-05/`
+  ([snapshot](findings/snapshot-2026-10-05.md)), taken after Monday's
+  service.
+* **Update**: 22:37 — At the user's request, the findings page (version 2)
+  gained the section "Changing drivers" (`findings_page/relief_data.py`,
+  new).
+* **Creation**: 22:21 — The user asked when drivers switch, what delay it
+  causes and which routes are bad for it. Answered in
+  [driver changes](findings/driver-changes.md) (question
+  [driver changes](questions/driver-changes.md)), with `[RELIEF]` added to
+  analysis.sql, from a copy of data/ taken 22:01 in the session scratchpad
+  (7 weekdays, 2 Saturdays, 2 Sundays with both feeds). Not committed.
+
 ## 2026-10-04
 
 * **Initialization**: 21:18 — Knowledge moved from DESIGN.md, FINDINGS.md,

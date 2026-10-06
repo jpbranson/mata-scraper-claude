@@ -1,9 +1,9 @@
 ---
 type: Question
 title: Which buses' trackers stop reporting?
-description: Ghost buses and GPS reliability, to settle before trusting anything else since bad trackers corrupt the delay stats (answered on 1.8 days; recheck after a week).
+description: Ghost buses and GPS reliability, to settle before trusting anything else since bad trackers corrupt the delay stats (answered on 12 days).
 tags: [gps]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-05T02:18:04Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T04:05:00Z }
 answer_status: answered
 sources:
   - id: questions-md
@@ -34,6 +34,6 @@ a dead tracker (their report times freeze too).
 
 # Status
 
-Answered on 1.8 days (recheck with a week of data): `[GPS]`, in
-[ghost trackers](../findings/ghost-trackers.md); the rule it settled is the
-[ghost threshold](../decisions/ghost-threshold.md).
+Answered on 12 days (8 weekdays, 2 Saturdays, 2 Sundays): `[GPS]`, in
+[ghost trackers](../findings/ghost-trackers.md); the rule it settled, the
+[ghost threshold](../decisions/ghost-threshold.md), holds on the 12 days.
