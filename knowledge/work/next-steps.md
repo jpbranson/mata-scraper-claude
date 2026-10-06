@@ -3,7 +3,7 @@ type: Plan
 title: Next steps (started 2026-09-25)
 description: Status of the "next steps" run (poller fixes, open questions, the question backlog, detour logging, findings page, the 12-day rerun, driver changes), and what still needs a human.
 tags: [plan]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T05:10:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-06T05:18:00Z }
 sources:
   - id: flight-log-md
     resource: https://github.com/jpbranson/mata-scraper-claude/blob/513d93a/FLIGHT_LOG.md
@@ -75,11 +75,10 @@ checks.)
   early, ≤5 min late", change the two numbers in `[Q1]` of
   [analysis.sql](../../analysis.sql). See
   [late threshold](../decisions/late-threshold.md).
-- **Deploy with `.\ops\update.ps1`.** `schedule.py` changed on
-  2026-10-05 (the poller's own timetable code is unchanged, only refactored,
-  and checked to give the same timetable), and the crosswalk files are now
-  committed at topo 198282, so an update no longer reverts them. Run it
-  from your own PowerShell when convenient.
+- ~~Deploy with `.\ops\update.ps1`.~~ Done: you ran it at 00:16 on
+  2026-10-06; both tasks restarted and the crosswalk stayed at topo 198282.
+  Still to confirm: the 04:00 "timetable for 2026-10-06" line in
+  `poller.log`, the first time the new `schedule.py` runs.
 
 # Open data questions
 
@@ -102,5 +101,4 @@ From the 12-day rerun; none is needed for the core questions.
 
 # Uncommitted changes
 
-(none: everything from the 2026-10-05 session, including the crosswalk at
-topo 198282, was committed and pushed on 2026-10-06)
+(none: everything up to the 2026-10-06 00:17 deployment entry is committed and pushed)

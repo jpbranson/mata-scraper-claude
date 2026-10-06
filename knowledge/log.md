@@ -2,6 +2,15 @@
 
 ## 2026-10-06
 
+* **Deployment**: 00:17 — The user ran `.\ops\update.ps1`; checked
+  read-only. `mata-poller` and `mata-web` both started 00:16:08 and were
+  still running at 00:17:39; the map server answers (`map.html`, HTTP 200);
+  `routes.csv`, `stops.csv` and `network.geojson` were left at topo 198282
+  (now committed, so the update's `git checkout` no longer reverts them).
+  The poller sleeps outside 04:00–24:00 without logging, so the new
+  `schedule.py` shows first at 04:00, in the "timetable for 2026-10-06"
+  line of `poller.log`.
+
 * **Request**: 00:10 — At the user's request, committed and pushed
   everything from 2026-10-05, including the crosswalk files at topo 198282.
 * **Update**: 00:09 — Findings page version 4, rebuilt on the 12-day copy
