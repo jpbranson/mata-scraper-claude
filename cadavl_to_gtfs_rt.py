@@ -284,7 +284,7 @@ def replay_frame(rows: list[dict], t: int) -> str:
     """Compact frame for the pages' replay, one line: the poll time and, per
     bus, the fields they need. The last three (headsign, next stop, fleet
     number) let the strips and schematic place a bus on its stop pattern;
-    frames from before 2026-09-25 lack them. ~110 bytes per bus."""
+    frames from before 2026-09-25 lack them. ~100 bytes per bus."""
     return json.dumps({"t": t, "v": [
         [r["vehicle_id"], r["route_id"], round(r["lat"], 5), round(r["lon"], 5),
          r["bearing"], r["delay_seconds"], r["delay_capped"], r["occupancy_pct"],

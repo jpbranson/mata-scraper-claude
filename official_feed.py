@@ -13,9 +13,10 @@ it). All three files are rebuilt every 30 s (measured 2026-09-25):
                                  is not running from Exeter @ Poplar at 5:30a")
 
 Vehicle ids here are fleet numbers (our `equipment_no`), and trip ids are
-the GTFS timetable's. Positions run about a minute behind the tracker, and
-there is no delay field, so the tracker stays the source for positions,
-delay and load; this archive adds what the tracker lacks.
+the GTFS timetable's. Positions are the same GPS fixes the tracker shows,
+but a snapshot comes only every 30 s, and there is no delay field, so the
+tracker stays the source for positions, delay and load; this archive adds
+what the tracker lacks.
 
 The poller calls `Official.update` every poll. Each snapshot not seen
 before is appended to data/official/dt=YYYY-MM-DD/ (UTC date, like the
