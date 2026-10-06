@@ -11,6 +11,12 @@ buses came.
     python backfill_replay.py                # every day in data/positions/
     python backfill_replay.py 2026-09-24     # one day (local date)
 
+Arrivals are matched to the timetable the poller saved for that day
+(data/schedule/<day>/), since the GTFS feed covers only today onward. A day
+with no saved timetable uses the feed's if it has service that day;
+otherwise its arrivals and schedule files are left as they are and only its
+replay frames are rebuilt.
+
 On the way it repairs two things older pollers got wrong: rows on lines
 routes.csv didn't know yet (`cadavl:<id>`, mapped with today's routes.csv
 where the ID is in it; backfill_routes.py fixes the history itself) and
@@ -38,6 +44,19 @@ from schedule import GTFS_PATH, Arrivals, Timetable, append_arrivals, fetch_gtfs
 FRAME_S = POLL_SECONDS * REPLAY_EVERY
 
 
+def timetable_for(day: date) -> Timetable | None:
+    """The day's saved timetable, else the feed's if it has service that day."""
+    tt = Timetable.saved(day)
+    if tt:
+        return tt
+    tt = Timetable(GTFS_PATH, day)
+    if not tt.due:
+        print(f"{day}: no saved timetable and no service in the feed; arrivals left as they are")
+        return None
+    tt.write()      # the stop panel needs the day's schedule too
+    return tt
+
+
 def main(only_day: str | None) -> None:
     files = sorted(OUT_DIR.glob("positions/dt=*/positions.jsonl.gz"))
     if not files:
@@ -48,23 +67,23 @@ def main(only_day: str | None) -> None:
     written: dict[str, int] = {}
     arrived: dict[str, list] = {}
     detector = Arrivals()
-    timetable = None
+    timetable, timetable_day = None, None
     open_paths = set()
     poll: list[dict] = []
     poll_t = None
     last_bin = None
 
     def flush() -> None:
-        nonlocal last_bin, timetable
+        nonlocal last_bin, timetable, timetable_day
         if not poll:
             return
         day = datetime.fromtimestamp(poll_t).strftime("%Y-%m-%d")
         if only_day and day != only_day:
             return
-        if timetable is None or timetable.day.isoformat() != day:
-            timetable = Timetable(GTFS_PATH, date.fromisoformat(day))
-            timetable.write()       # the stop panel needs the day's schedule too
-        arrived.setdefault(day, []).extend(detector.update(timetable, poll))
+        if timetable_day != day:
+            timetable, timetable_day = timetable_for(date.fromisoformat(day)), day
+        if timetable:
+            arrived.setdefault(day, []).extend(detector.update(timetable, poll))
         if poll_t // FRAME_S == last_bin:
             return
         path = replay_path(poll_t)

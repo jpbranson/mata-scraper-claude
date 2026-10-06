@@ -79,6 +79,22 @@ def dist_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 6371000 * math.hypot(x, math.radians(lat2 - lat1))
 
 
+def read_stops() -> dict[str, dict]:
+    with STOPS_CSV.open(encoding="utf-8") as fh:
+        return {r["stop_code"]: r for r in csv.DictReader(fh)}
+
+
+def name_index(pattern: set[tuple], stops: dict[str, dict]) -> dict[tuple, list]:
+    """(route, headsign, stop name as the tracker spells it) -> [(code, lat, lon)]
+    for every (route, headsign, stop code) in `pattern`."""
+    by_name: dict[tuple, list] = defaultdict(list)
+    for route, head, code in pattern:
+        s = stops.get(code)
+        if s and s["lat"]:
+            by_name[(route, head, s["stop_name"])].append((code, float(s["lat"]), float(s["lon"])))
+    return by_name
+
+
 class Timetable:
     """One service day of the GTFS feed, indexed for matching."""
 
@@ -116,16 +132,40 @@ class Timetable:
         for times in self.due.values():
             times.sort()
 
-        with STOPS_CSV.open(encoding="utf-8") as fh:
-            stops = {r["stop_code"]: r for r in csv.DictReader(fh)}
+        stops = read_stops()
         self.patterns = self._patterns(all_trips, calls, services, stops)
-        # (route, headsign, stop name as the tracker spells it) -> [(code, lat, lon)]
-        self.by_name: dict[tuple, list] = defaultdict(list)
-        for route, head, code in pattern:
-            s = stops.get(code)
-            if s and s["lat"]:
-                self.by_name[(route, head, s["stop_name"])].append(
-                    (code, float(s["lat"]), float(s["lon"])))
+        self.by_name = name_index(pattern, stops)
+
+    @classmethod
+    def saved(cls, day: date) -> Timetable | None:
+        """The day's timetable as `write` saved it (data/schedule/<day>/), or
+        None if it wasn't. The feed covers only today onward, so these files
+        are the only record of a past day's. Stop names come from the stop
+        patterns saved with it."""
+        files = [f for f in (OUT_DIR / "schedule" / day.isoformat()).glob("*.json")
+                 if f.name != "stops.json"]
+        if not files:
+            return None
+        self = cls.__new__(cls)
+        self.day = day
+        self.t0 = local_midnight(day)
+        self.due = defaultdict(list)
+        self.patterns = {}
+        pattern: set[tuple] = set()
+        for f in files:
+            route, saved = f.stem, json.loads(f.read_text())
+            for code, times in saved["stops"].items():
+                for secs, i in times:
+                    trip, head = saved["trips"][i]
+                    self.due[(route, head, code)].append((saved["t0"] + secs, trip))
+                    pattern.add((route, head, code))
+            self.patterns[route] = saved.get("patterns", [])
+            for p in self.patterns[route]:
+                pattern.update((route, p["head"], s[0]) for s in p["stops"])
+        for times in self.due.values():
+            times.sort()
+        self.by_name = name_index(pattern, read_stops())
+        return self
 
     @staticmethod
     def _patterns(all_trips: dict, calls: dict, services: set, stops: dict) -> dict[str, list]:
