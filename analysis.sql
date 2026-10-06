@@ -1,7 +1,10 @@
 -- Questions from knowledge/questions/, over data/.
--- Run from the repo root:  duckdb < analysis.sql   (all of it takes about a
--- minute; every query stands alone after the views, so copy out the one
--- you want). Each query is tagged [..]; knowledge/findings/ cites them by tag.
+-- Paths are relative, so run it from inside a copy of data/'s parent, never
+-- the repo root while the poller writes data/ (findings_page/snapshot.py
+-- makes a copy):  duckdb < ..\..\analysis.sql   (all of it takes about
+-- 4 minutes on 12 days; every query stands alone after the views, so copy
+-- out the one you want). Each query is tagged [..]; knowledge/findings/
+-- cites them by tag.
 
 -- ============================================================ views
 
@@ -14,7 +17,7 @@ FROM read_json_auto('data/positions/*/positions.jsonl.gz', hive_partitioning = t
 -- Rows worth trusting for delay: a delay was reported, it isn't a "1h+" cap,
 -- and the bus hasn't sat still for 30+ polls (5 min). Those are mostly
 -- layovers and holds, not dead GPS, but dropping them or the real ghosts
--- instead moves no route's late share by more than a point ([GPS]).
+-- instead moves no route's late share by more than 1.4 points ([GPS]).
 CREATE VIEW good AS
 SELECT * FROM pos
 WHERE delay_seconds IS NOT NULL AND NOT delay_capped AND unchanged_polls < 30;
@@ -199,10 +202,13 @@ WHERE t.due < (SELECT max(observed_at) FROM pos) - 1800;
 -- The usual on-time window is at most 1 min early and 5 min late. The
 -- vendor says "on time" within a minute either way and never "1 min", so
 -- in its whole minutes, early is 2+ min early and late is 6+ min late.
+-- `weekday_over_5_min` compares routes on the days they all run: quiet
+-- Sundays pull down only the routes that run on Sundays.
 SELECT route_id,
        count(*)                                   AS bus_polls,
        round(median(delay_seconds) / 60, 1)       AS median_min_late,
        round(avg((delay_seconds > 300)::int), 2)  AS share_over_5_min,
+       round(avg((delay_seconds > 300)::int) FILTER (WHERE dayofweek(t) BETWEEN 1 AND 5), 2) AS weekday_over_5_min,
        round(avg((delay_seconds < -60)::int), 2)  AS share_early,
        round(avg((delay_seconds BETWEEN -60 AND 300)::int), 2) AS on_time
 FROM good
@@ -222,10 +228,13 @@ ORDER BY share_over_5_min DESC;
 
 -- [Q3] 3. How many people are riding right now?
 -- The load % is riders out of 50 on every vehicle, so riders = % / 2.
+-- The columns are named because after service the vehicle list is empty,
+-- and there is nothing to infer them from.
 SELECT count(*)                                AS buses_in_service,
-       sum(occupancy_pct) // 2                 AS riders
+       coalesce(sum(occupancy_pct), 0) // 2    AS riders
 FROM (SELECT unnest(vehicles, recursive := true)
-      FROM read_json_auto('data/latest.json'))
+      FROM read_json('data/latest.json',
+                     columns = {vehicles: 'STRUCT(occupancy_pct INTEGER, unchanged_polls INTEGER)[]'}))
 WHERE unchanged_polls < 30;
 
 -- ============================================================ open questions (knowledge/decisions/)
@@ -244,14 +253,15 @@ LIMIT 15;
 
 -- ============================================================ knowledge/questions/ 1: delay
 
--- [WHERE] Where along a route delay builds up. For each stop, the delay a
+-- [WHERE] Where along a route delay builds up. For each stop, the lateness a
 -- bus gained since the previous stop logged on its trip (within 15 min),
 -- over every trip that passed: `min_per_day` is bus-minutes lost there per
--- day, the places worth fixing first. Negative = buses make time up (or
--- wait out being early at a timepoint).
+-- day, the places worth fixing first. Early counts as on time, so a bus
+-- waiting out being early at a timepoint gains nothing. Negative = late
+-- buses make time up.
 WITH a AS (
     SELECT day, route, headsign, trip, vehicle, stop, t, delay,
-           delay - lag(delay) OVER w AS gained, t - lag(t) OVER w AS secs
+           greatest(delay, 0) - greatest(lag(delay) OVER w, 0) AS gained, t - lag(t) OVER w AS secs
     FROM arrivals_due
     WINDOW w AS (PARTITION BY day, trip, vehicle ORDER BY t))
 SELECT a.route, s.stop_name, a.headsign,
@@ -293,13 +303,15 @@ FROM d JOIN r USING (route_id)
 WHERE r.spread >= 0.10
 ORDER BY r.spread DESC, d.route_id, d.late DESC;
 
--- [HOUR] When does it go bad? By hour of day, every route. With weeks of
--- data, add dayname(t) to compare weekdays and weekends.
-SELECT hour(t) AS hour, count(*) AS polls,
+-- [HOUR] When does it go bad? By hour of day, every route, weekdays apart
+-- from Saturdays and Sundays (their service and traffic differ). Add
+-- dayname(t) to compare one weekday with another once there are weeks.
+SELECT CASE dayofweek(t) WHEN 6 THEN 'Sat' WHEN 0 THEN 'Sun' ELSE 'Weekday' END AS day_type,
+       hour(t) AS hour, count(*) AS polls,
        round(median(delay_seconds) / 60, 1)        AS median_min_late,
        round(avg((delay_seconds > 300)::int), 2)   AS share_over_5_min,
        round(avg((delay_seconds < -60)::int), 2)   AS share_early
-FROM good GROUP BY 1 ORDER BY 1;
+FROM good GROUP BY 1, 2 ORDER BY 1, 2;
 
 -- [EARLY] Early running where it strands riders: buses leaving a timepoint
 -- mid-route 2+ min early (someone there on time misses them), by route and
@@ -312,21 +324,61 @@ GROUP BY ALL HAVING count(*) >= 15
 ORDER BY share_early DESC
 LIMIT 15;
 
+-- [RELIEF] Driver changes at the garage. No feed names the driver, but the
+-- garage is on Levee Rd off Watkins St, and routes 42 and 08 pass it with
+-- riders on board. A relief there is one trip, the same trip most days,
+-- that sits 3+ min longer than the route's usual pass and leaves 2+ min late,
+-- having gained 3+ min there (an early bus holding for time leaves on time).
+-- Per trip: its time within 450 m of the garage against the usual for that
+-- route, direction and service day, and the delay it gains there.
+WITH p AS (
+    SELECT route_id, destination, trip_id, t::date AS day, observed_at, delay_seconds
+    FROM pos
+    WHERE route_id IN ('08', '42') AND trip_id IS NOT NULL AND NOT delay_capped
+      AND dist_m(lat, lon, 35.1755, -90.0090) < 450),
+pass AS (
+    SELECT route_id, destination, trip_id, regexp_extract(trip_id, '^(.*?)[0-9]+$', 1) AS service, day,
+           max(observed_at) - min(observed_at)  AS secs,
+           arg_min(delay_seconds, observed_at)  AS delay_in,
+           arg_max(delay_seconds, observed_at)  AS delay_out
+    FROM p GROUP BY ALL),
+usual AS (
+    SELECT route_id, destination, service, median(secs) AS usual_secs FROM pass GROUP BY ALL),
+starts AS (
+    SELECT trip, min(hm) AS hm
+    FROM (SELECT trip, strftime(to_timestamp(min(t_sched)) AT TIME ZONE 'America/Chicago', '%H:%M') AS hm
+          FROM sched GROUP BY day, trip)
+    GROUP BY trip),
+x AS (
+    SELECT p.*, u.usual_secs,
+           (p.secs - u.usual_secs >= 180 AND p.delay_out - p.delay_in >= 180 AND p.delay_out >= 120) AS relief
+    FROM pass p JOIN usual u USING (route_id, destination, service))
+SELECT x.route_id AS route, x.destination, x.service, s.hm AS trip_starts,
+       count(*)                                    AS days,
+       round(any_value(x.usual_secs) / 60, 1)      AS usual_min,
+       round(median(x.secs) / 60, 1)               AS median_min,
+       round(median(x.delay_out - x.delay_in) / 60, 1) AS median_min_gained,
+       round(avg(x.relief::int), 2)                AS share_relief
+FROM x LEFT JOIN starts s ON s.trip = x.trip_id
+GROUP BY x.route_id, x.destination, x.service, x.trip_id, s.hm
+HAVING count(*) >= 2 AND avg(x.relief::int) >= 0.5
+ORDER BY x.service, trip_starts;
+
 -- ============================================================ knowledge/questions/ 2: ridership and crowding
 
 -- [LOAD] Peak loads by route: riders on board (load % / 2) over its
--- bus-polls, and its fullest hour on average. 40 riders fill a 40-ft
--- bus's seats.
+-- bus-polls, and its fullest weekday hour on average (weekend hours would
+-- pull it around). 40 riders fill a 40-ft bus's seats.
 WITH h AS (
     SELECT route_id, hour(t) AS hour, avg(occupancy_pct) AS load
-    FROM pos WHERE unchanged_polls < 30 GROUP BY ALL),
-peak AS (SELECT route_id, arg_max(hour, load) AS busiest_hour FROM h GROUP BY 1)
+    FROM pos WHERE unchanged_polls < 30 AND dayofweek(t) BETWEEN 1 AND 5 GROUP BY ALL),
+peak AS (SELECT route_id, arg_max(hour, load) AS busiest_weekday_hour FROM h GROUP BY 1)
 SELECT route_id,
        round(avg(occupancy_pct) / 2, 1)              AS avg_riders,
        quantile_disc(occupancy_pct, 0.95) // 2       AS p95_riders,
        max(occupancy_pct) // 2                       AS max_riders,
        round(avg((occupancy_pct >= 80)::int), 3)     AS share_seats_full,
-       any_value(busiest_hour)                       AS busiest_hour
+       any_value(busiest_weekday_hour)               AS busiest_weekday_hour
 FROM pos JOIN peak USING (route_id)
 WHERE unchanged_polls < 30
 GROUP BY route_id
@@ -374,18 +426,26 @@ GROUP BY 1, 2 ORDER BY 1;
 
 -- [BOARDINGS] Where do buses fill and empty? Each change in a bus's load
 -- between polls (up to 30 s apart) goes to the stop it was serving, its
--- next stop in the earlier poll: riders on and off per day. Net changes
--- only, so both are floors.
-WITH d AS (
-    SELECT route_id, t, lag(next_stop_name) OVER v AS stop,
+-- next stop in the earlier poll: riders on and off per weekday, and on per
+-- weekend day, over days with 6+ hours of service recorded. Net changes
+-- only, so both are floors. Riders who board at a transit center while the
+-- bus waits there show under the first stop out, which the bus already
+-- shows as next (Second @ Jackson for William Hudson).
+WITH days AS (
+    SELECT t::date AS day, dayofweek(t::date) IN (0, 6) AS weekend
+    FROM pos GROUP BY 1 HAVING date_diff('hour', min(t), max(t)) >= 6),
+d AS (
+    SELECT route_id, t::date AS day, lag(next_stop_name) OVER v AS stop,
            (occupancy_pct - lag(occupancy_pct) OVER v) / 2 AS change,
            observed_at - lag(observed_at) OVER v AS gap
     FROM pos WINDOW v AS (PARTITION BY vehicle_id ORDER BY observed_at))
 SELECT stop, string_agg(DISTINCT route_id, ',' ORDER BY route_id) AS routes,
-       round(sum(greatest(change, 0)) / count(DISTINCT t::date))  AS on_per_day,
-       round(sum(greatest(-change, 0)) / count(DISTINCT t::date)) AS off_per_day
-FROM d WHERE stop IS NOT NULL AND gap <= 30
-GROUP BY stop ORDER BY on_per_day DESC
+       round(sum(greatest(change, 0)) FILTER (WHERE NOT weekend) / (SELECT count(*) FROM days WHERE NOT weekend)) AS on_per_weekday,
+       round(sum(greatest(-change, 0)) FILTER (WHERE NOT weekend) / (SELECT count(*) FROM days WHERE NOT weekend)) AS off_per_weekday,
+       round(sum(greatest(change, 0)) FILTER (WHERE weekend) / (SELECT count(*) FROM days WHERE weekend)) AS on_per_weekend_day
+FROM d JOIN days USING (day)
+WHERE stop IS NOT NULL AND gap <= 30
+GROUP BY stop ORDER BY on_per_weekday DESC
 LIMIT 20;
 
 -- ============================================================ knowledge/questions/ 3: service delivered vs promised
@@ -420,8 +480,9 @@ ORDER BY bunched DESC, gaps DESC;
 
 -- [FLEET] Buses out against buses the timetable needs, at half past each
 -- hour: trips in progress then (each needs a bus) against buses in the
--- tracker, averaged over the days recorded. Buses at layover drop out of
--- the tracker and aren't in progress either.
+-- tracker, averaged over the days recorded, weekdays apart from Saturdays
+-- and Sundays. Buses at layover drop out of the tracker and aren't in
+-- progress either.
 WITH polls AS (SELECT DISTINCT observed_at, t FROM pos),
 pick AS (
     SELECT strftime(t, '%Y-%m-%d') AS day, hour(t) AS hour,
@@ -433,11 +494,12 @@ need AS (
     SELECT p.day, p.hour, p.at_, count(x.trip) AS scheduled
     FROM pick p JOIN trips x ON x.day = p.day AND p.at_ BETWEEN x.t0 AND x.t1
     GROUP BY ALL)
-SELECT n.hour, count(*) AS days,
+SELECT CASE dayofweek(n.day::DATE) WHEN 6 THEN 'Sat' WHEN 0 THEN 'Sun' ELSE 'Weekday' END AS day_type,
+       n.hour, count(*) AS days,
        round(avg(n.scheduled), 1) AS trips_in_progress, round(avg(b.in_tracker), 1) AS buses_seen,
        round(avg(b.in_tracker - n.scheduled), 1) AS short_by
 FROM need n JOIN buses b ON b.observed_at = n.at_
-GROUP BY 1 ORDER BY 1;
+GROUP BY 1, 2 ORDER BY 1 DESC, 2;
 
 -- [SPEED] Speed profiles (mph): by route, all day, at the peaks (7-9 and
 -- 16-18) and midday (10-15), stops included; dead trackers, long still
@@ -477,25 +539,28 @@ LIMIT 20;
 
 -- ============================================================ knowledge/questions/ 4: MATA's official feed
 
--- [MISSED] Trips that never ran, by route and day. Most were never marked
--- canceled; MATA's alerts ("Route 1 is not running from William Hudson at
--- 5:15a") name some of them in free text.
-SELECT day, route,
+-- [MISSED] Trips that never ran, by day and route, with each day's total
+-- (route `all`). Most were never marked canceled; MATA's alerts ("Route 1
+-- is not running from William Hudson at 5:15a") name some of them in free
+-- text. `marked_canceled` is blank before 2026-09-25, when there was no
+-- official feed to mark them.
+SELECT day, coalesce(route, 'all') AS route,
        count(*)                                        AS scheduled,
        count(*) FILTER (WHERE NOT ran)                 AS never_ran,
        round(avg((NOT ran)::int), 2)                   AS share_missed,
-       count(*) FILTER (WHERE NOT ran AND canceled)    AS marked_canceled
+       CASE WHEN day >= '2026-09-25' THEN count(*) FILTER (WHERE NOT ran AND canceled) END AS marked_canceled
 FROM trip_service
-GROUP BY ALL
-ORDER BY day, share_missed DESC, route;
+GROUP BY GROUPING SETS ((day), (day, route))
+ORDER BY day, grouping(route) DESC, share_missed DESC, route;
 
 -- [MISSED_HOUR] Share of trips that never ran, by the hour they were due
--- to leave, every route.
-SELECT hour(to_timestamp(due) AT TIME ZONE 'America/Chicago') AS hour,
+-- to leave, every route, weekdays apart from Saturdays and Sundays.
+SELECT CASE dayofweek(day::DATE) WHEN 6 THEN 'Sat' WHEN 0 THEN 'Sun' ELSE 'Weekday' END AS day_type,
+       hour(to_timestamp(due) AT TIME ZONE 'America/Chicago') AS hour,
        count(*) AS scheduled, count(*) FILTER (WHERE NOT ran) AS never_ran,
        round(avg((NOT ran)::int), 2) AS share_missed
 FROM trip_service
-GROUP BY 1 ORDER BY 1;
+GROUP BY 1, 2 ORDER BY 1 DESC, 2;
 
 -- [PREDICT] Are the countdowns riders see honest? Each prediction in MATA's
 -- trip updates (trips with a bus on them) against when the bus left that
@@ -550,9 +615,12 @@ ORDER BY on_time, departures DESC;
 -- [TRIPMATCH] Does schedule.py's trip matching hold up? Each official
 -- vehicle report (bus = fleet number) against our row for the same bus
 -- nearest in time (within a minute): `same` counts only rows where we
--- named a trip; `ours_none` is how often we didn't.
+-- named a trip; `ours_none` is how often we didn't. Trips MATA's dispatch
+-- adds that are in no timetable (`adhoc`, IDs like
+-- 0_Weekday2026-10-01-19-35-14-...) can't match and are left out of `same`.
 WITH o AS (
-    SELECT DISTINCT vehicle_id AS equipment_no, reported_at, trip_id AS off_trip
+    SELECT DISTINCT vehicle_id AS equipment_no, reported_at, trip_id AS off_trip,
+           trip_id NOT IN (SELECT trip FROM sched) AS adhoc
     FROM off_vehicles WHERE trip_id IS NOT NULL AND reported_at IS NOT NULL),
 m AS (
     SELECT o.*, p.trip_id AS our_trip, p.route_id
@@ -562,34 +630,49 @@ m AS (
                                ORDER BY abs(p.observed_at - o.reported_at)) = 1)
 SELECT coalesce(route_id, 'all')                   AS route,
        count(*)                                    AS compared,
-       round(avg((our_trip = off_trip)::int), 3)   AS same,
-       round(avg((our_trip IS NULL)::int), 3)      AS ours_none
+       round(avg((our_trip = off_trip)::int) FILTER (WHERE NOT adhoc), 3) AS same,
+       round(avg((our_trip IS NULL)::int), 3)      AS ours_none,
+       count(*) FILTER (WHERE adhoc)               AS adhoc
 FROM m
 GROUP BY ROLLUP (route_id)
 ORDER BY same, compared DESC;
 
--- [LAYOVER] How long buses sit at the start of a trip before leaving, from
--- MATA's feed (the tracker drops them there): time stopped at the trip's
--- first stop, and whether short waits go with late starts (5+ min late at
--- the first stop the tracker logged on the trip; at the first stop itself
--- the tracker still shows the previous trip's headsign).
+-- [LAYOVER] How long buses lay over before a trip, from MATA's feed (the
+-- tracker drops them there): from when the bus last moved 50 m+ to when it
+-- left the trip's first stop. The feed marks a bus STOPPED_AT that stop
+-- only from about 5 minutes before the trip is due, so time STOPPED_AT is
+-- not the layover. `slack`: minutes the bus was there before the trip was
+-- due (negative: it got there late). Late start: 5+ min late at the first
+-- stop the tracker logged on the trip (at the first stop itself the tracker
+-- still shows the previous trip's headsign).
 WITH first_stop AS (
-    SELECT day, trip, arg_min(stop, t_sched) AS stop FROM sched GROUP BY ALL),
+    SELECT day, trip, arg_min(stop, t_sched) AS stop, min(t_sched) AS due FROM sched GROUP BY ALL),
+moved AS (
+    SELECT vehicle_id, feed_ts
+    FROM (SELECT DISTINCT vehicle_id, feed_ts, lat, lon FROM off_vehicles WHERE lat IS NOT NULL)
+    WINDOW w AS (PARTITION BY vehicle_id ORDER BY feed_ts)
+    QUALIFY lag(lat) OVER w IS NULL OR dist_m(lag(lat) OVER w, lag(lon) OVER w, lat, lon) > 50),
 sat AS (
-    SELECT v.day, v.trip_id AS trip, any_value(v.route_id) AS route,
-           (max(v.feed_ts) - min(v.feed_ts)) / 60 AS minutes
+    SELECT v.day, v.trip_id AS trip, any_value(v.route_id) AS route, any_value(v.vehicle_id) AS vehicle_id,
+           any_value(f.due) AS due, min(v.feed_ts) AS t_in, max(v.feed_ts) AS t_out
     FROM off_vehicles v JOIN first_stop f ON f.day = v.day AND f.trip = v.trip_id
                                           AND v.stop_id = '0:' || f.stop
     WHERE v.stop_status = 'STOPPED_AT'
     GROUP BY v.day, v.trip_id),
+lay AS (
+    SELECT s.*, (s.t_out - m.feed_ts) / 60 AS minutes, (s.due - m.feed_ts) / 60 AS slack
+    FROM sat s ASOF LEFT JOIN moved m ON m.vehicle_id = s.vehicle_id AND m.feed_ts <= s.t_in),
 start AS (SELECT day, trip, arg_min(delay, t) AS delay FROM arrivals_due GROUP BY ALL)
-SELECT coalesce(s.route, 'all') AS route, count(*) AS trips,
-       round(median(s.minutes)) AS median_min_sat,
-       round(avg((s.minutes < 5)::int), 2) AS share_under_5,
-       round(avg((d.delay > 300)::int) FILTER (WHERE s.minutes < 5), 2)  AS late_start_after_short,
-       round(avg((d.delay > 300)::int) FILTER (WHERE s.minutes >= 5), 2) AS late_start_after_long
-FROM sat s LEFT JOIN start d USING (day, trip)
-GROUP BY ROLLUP (s.route) ORDER BY trips DESC;
+SELECT coalesce(l.route, 'all') AS route, count(*) AS trips,
+       round(median(l.minutes)) AS median_layover_min,
+       round(median(l.slack)) AS median_min_before_due,
+       round(avg((l.slack < 5)::int), 2) AS share_under_5,
+       round(avg((l.slack < 0)::int), 2) AS share_arrived_late,
+       round(avg((d.delay > 300)::int) FILTER (WHERE l.slack < 0), 2) AS late_start_arrived_late,
+       round(avg((d.delay > 300)::int) FILTER (WHERE l.slack BETWEEN 0 AND 5), 2) AS late_start_after_short,
+       round(avg((d.delay > 300)::int) FILTER (WHERE l.slack > 5), 2) AS late_start_after_long
+FROM lay l LEFT JOIN start d USING (day, trip)
+GROUP BY ROLLUP (l.route) ORDER BY trips DESC;
 
 -- ============================================================ knowledge/questions/ 5
 
