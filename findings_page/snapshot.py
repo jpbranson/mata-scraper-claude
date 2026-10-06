@@ -1,20 +1,22 @@
 """Copy what analysis.sql reads from the poller's data/ into
-findings_page/snapshot/, so the page's queries never hold the live files
-open (the poller appends to them and replaces latest.json every 10 s).
-Later runs copy only the files that changed.
+findings_page/snapshot/ (or DEST_DIR), so the page's queries never hold the
+live files open (the poller appends to them and replaces latest.json every
+10 s). Later runs copy only the files that changed, so give a new DEST_DIR
+to keep an older copy as it was.
 
-    .venv\\Scripts\\python findings_page\\snapshot.py
+    .venv\\Scripts\\python findings_page\\snapshot.py [DEST_DIR]
 """
 import pathlib
 import shutil
+import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parent
 SRC = REPO / "data"
-DST = HERE / "snapshot"
+DST = pathlib.Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else HERE / "snapshot"
 
 n = 0
-for sub in ("positions", "official", "arrivals", "schedule"):
+for sub in ("positions", "official", "arrivals", "schedule", "detours"):
     for f in (SRC / sub).rglob("*"):
         if not f.is_file() or f.suffix == ".tmp":
             continue

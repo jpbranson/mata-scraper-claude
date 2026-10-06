@@ -227,88 +227,114 @@ footer code { font-family: inherit; font-variant-caps: all-small-caps; letter-sp
 <article>
   <header>
     <h1>Memphis Buses, Measured</h1>
-    <p class="subtitle">Two weekdays of MATA service, read from the agency&rsquo;s own bus tracker and its GTFS-Realtime feed</p>
-    <p class="dateline">Thursday 24 September 2026, a full service day, and Friday 25 September to 20:20 &middot; 351,576 bus positions from 11,030 polls of MATA&rsquo;s bus tracker &middot; 1,640 snapshots of MATA&rsquo;s official feed from Friday 05:45 &middot; 1,269 scheduled trips checked</p>
+    <p class="subtitle">Twelve days of MATA service, read from the agency&rsquo;s own bus tracker and its GTFS-Realtime feed</p>
+    <p class="dateline">Thursday 24 September to Monday 5 October 2026: eight weekdays, two Saturdays and two Sundays &middot; 2,217,873 bus positions from 71,158 polls of MATA&rsquo;s bus tracker &middot; 20,693 snapshots of MATA&rsquo;s official feed from 25 September &middot; 6,702 scheduled trips checked</p>
   </header>
 
   <section class="lede">
-    <p><span class="marginnote">Positions, delays and loads come from MATA&rsquo;s public bus tracker, polled several times a minute. Trip IDs, departures and countdowns come from MATA&rsquo;s GTFS-Realtime feed. The timetable is MATA&rsquo;s published GTFS. Each graphic names the query in <code>analysis.sql</code> that made it.</span>Across these two days MATA&rsquo;s timetable called for 1,269 trips that can be checked, and 185 of them never ran: no bus appeared on them, in the tracker or in MATA&rsquo;s own feed. That is one trip in seven, spread across the whole day <span class="spark" id="spark-missed"></span> and worst at 6&nbsp;a.m., when 23% of trips never left.</p>
-    <p>The trips that did run left their first stop a median of 4.2 minutes behind schedule, and on most routes made the time back on the road, where the timetable has slack. They almost never bunched; at intervals of 45 to 120 minutes a late bus is simply late. A rider who reached a stop two minutes early waited a median of 4.9 minutes for the next bus, and more than a quarter of an hour 23% of the time.</p>
+    <p><span class="marginnote">Positions, delays and loads come from MATA&rsquo;s public bus tracker, polled every ten seconds. Trip IDs, departures and countdowns come from MATA&rsquo;s GTFS-Realtime feed. The timetable is MATA&rsquo;s published GTFS. Each graphic names the query in <code>analysis.sql</code> that made it.</span>Over these twelve days MATA&rsquo;s timetable called for 6,702 trips, and 603 of them never ran: no bus appeared on them, in the tracker or in MATA&rsquo;s own feed. That is one trip in eleven, lost on every route and through the whole weekday <span class="spark" id="spark-missed"></span>, and worst late in the evening, when 23% of the weekday trips due at 9&nbsp;p.m. never left.</p>
+    <p>The trips that did run left their first stop a median of 3.9 minutes behind schedule, and on most routes made the time back on the road, where the timetable has slack. They almost never bunched; at intervals of 45 to 120 minutes a late bus is simply late. A rider who reached a stop two minutes early waited a median of 4.3 minutes for the next bus, and more than a quarter of an hour 16% of the time. Weekdays and Saturdays look much alike. Sundays, with less traffic and a shorter day, run best.</p>
   </section>
 
   <section id="missed">
     <h2>The trips that never came</h2>
-    <p>Each tick below is one trip in MATA&rsquo;s timetable, placed at the minute it was due to leave its first stop. Gray ticks ran. Red ticks never did: no bus was seen on them by the tracker or by MATA&rsquo;s feed, which agree on 464 of the 471 Friday trips the feed saw running. Routes are ordered by the share of their trips that never ran.</p>
+    <p>Each row below is a route and each column a day. A red cell means some of that day&rsquo;s trips never ran: no bus was seen on them by the tracker or by MATA&rsquo;s feed, which agree on 5,402 of the 5,484 trips the feed saw running. The darker the cell, the larger the share. A thin gray line means every trip ran, and a blank cell that the route has no service that day. Routes are ordered by the share of their trips that never ran.</p>
     <figure class="fullwidth">
-      <div class="legend"><span><i class="k k-tick k-ran"></i>ran</span><span><i class="k k-tick k-late"></i>never ran</span><span><i class="k k-canc"></i>never ran, and marked canceled in MATA&rsquo;s feed</span></div>
-      <div class="chart" id="fig-barcode"></div>
-      <figcaption>Scheduled trips by route and departure time. Friday counts trips due by 19:50. The right-hand column gives trips that never ran, of those scheduled. <span class="tag">[missed]</span></figcaption>
-      <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-barcode"></div></details>
+      <div class="legend"><span><i class="k k-sq" style="background:var(--late);opacity:.4"></i>a tenth of the day&rsquo;s trips</span><span><i class="k k-sq" style="background:var(--late);opacity:.7"></i>a quarter</span><span><i class="k k-sq k-late"></i>two in five or more</span><span><i class="k k-line k-ran" style="height:1px"></i>every trip ran</span><span><i class="k k-sq k-band"></i>weekend</span></div>
+      <div class="chart" id="fig-missed"></div>
+      <figcaption>Scheduled trips that never ran, by route and day. The right-hand column totals all twelve days. <span class="tag">[missed]</span></figcaption>
+      <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-missed"></div></details>
     </figure>
-    <p><span class="marginnote">MATA&rsquo;s own records undercount this. Its feed marked 27 of Friday&rsquo;s 101 unrun trips as canceled, and 5 trips it marked canceled did run. Its 34 rider alerts that day are dispatchers&rsquo; free text, such as &ldquo;Route 1 is not running from William Hudson at 5:15a,&rdquo; and some carry the wrong route tag.</span>Some routes lost whole mornings. Route 01 (Union) lost 2 of its 45 trips on Thursday. On Friday the first of its trips to run was the 12:45, and it lost 31 of 40. On Thursday route 69 (Winchester) ran nothing before its 14:30 trip and lost 13 of 17, and route 53 (Summer) lost 19 of 31. Routes 04, 07, 13, 40 and the trolley lost nothing on either day.</p>
+    <p><span class="marginnote">MATA&rsquo;s own records undercount this. On the days its feed covers it marked 126 of the 519 trips that never ran as canceled, and 36 trips it marked canceled did run. Its 194 rider alerts are dispatchers&rsquo; free text, such as &ldquo;Route 1 is not running from William Hudson at 5:15a,&rdquo; and some carry the wrong route tag.</span>Route 01 (Union) lost the most, a quarter of its trips, then 34, 53 and 02 at about a fifth. Every route lost at least one trip, the trolley exactly one. The losses come in runs: a route loses one bus for hours, and with it every trip that bus was due to make. Weekdays lost 9.8% of their trips, Saturdays 5.6% and Sundays 7.3%.</p>
+  </section>
+
+  <section id="days">
+    <h2>Which days are bad</h2>
+    <p>Sundays are the good days. On both, 8% of bus-polls ran five or more minutes late, against 17 to 21% on weekdays and 16 to 19% on Saturdays. Twelve days are enough to tell weekdays from weekends, but with one or two of each weekday they can&rsquo;t yet rank Monday against Friday.</p>
+    <figure>
+      <span class="marginnote">Each day, the share of bus-polls five or more minutes late (top) and of scheduled trips that never ran (bottom). Weekends are shaded. <span class="tag">[q2] [missed]</span></span>
+      <div class="chart" id="fig-days"></div>
+      <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-days"></div></details>
+    </figure>
+    <p>A bad day is a few routes having a bad day. On the latest, Wednesday 30 September at 21%, route 28 was late 63% of the time, 34 45%, 02 40%, 01 39% and 12 36%; without those five the day was an ordinary 17%. On Saturday 3 October route 42 ran late all day, 46% of its bus-polls, with no rider message to say why. Missed trips swing more than lateness: from 6% of a weekday&rsquo;s trips to 16% on Friday 25 September.</p>
   </section>
 
   <section id="late">
     <h2>Late from the first stop</h2>
-    <p>MATA&rsquo;s feed holds each bus at the first stop of its next trip until it leaves, which makes it a good clock for departures. Of 455 departures on Friday, 60% left on time, at most a minute early or five minutes late. Forty percent left more than five minutes late. Three left early.</p>
+    <p>MATA&rsquo;s feed holds each bus at the first stop of its next trip until it leaves, which makes it a good clock for departures. Of 5,011 departures over eleven days, 60% left on time, at most a minute early or five minutes late; 58% on weekdays and 75% on Sundays. Thirty-nine percent left more than five minutes late. One in a hundred left early.</p>
     <figure>
-      <span class="marginnote">Minutes between scheduled and actual departure from the first stop, Friday, every route. Bars inside the bracket are on time. <span class="tag">[depart]</span></span>
+      <span class="marginnote">Minutes between scheduled and actual departure from the first stop, every route, 25 September to 5 October. Bars inside the bracket are on time. <span class="tag">[depart]</span></span>
       <div class="chart" id="fig-depart"></div>
       <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-depart"></div></details>
     </figure>
-    <p>Once under way, most routes recover. Following each trip from the first stop the tracker logged to the last, 15 of 24 routes finish more than two minutes earlier than they started, so their timetables carry slack. Six routes lose more time on the road: 02, 28, 01, 13, 36 and 08.</p>
+    <p>Once under way, most routes recover. Following each weekday trip from the first stop the tracker logged to the last, 15 of 24 routes finish more than two minutes earlier than they started, so their timetables carry slack. Six routes lose a little more time on the road, 0.7 to 1.5 minutes a trip: 13, 01, 08, 28, 36 and 02.</p>
     <figure>
-      <span class="marginnote">Mean delay at the first and last stops logged on each trip, for trips logged over 20 minutes or more, ends of lines left out. Route 02 trips start 4.2 minutes late on average and end 8.0 late. <span class="tag">[where_route]</span></span>
+      <span class="marginnote">Mean delay at the first and last stops logged on each weekday trip, for trips logged over 20 minutes or more, ends of lines left out. Route 13 trips start 1.8 minutes late on average and end 3.3 late. <span class="tag">[where_route]</span></span>
       <div class="legend"><span><svg class="k" width="10" height="10" aria-hidden="true"><circle cx="5" cy="5" r="3.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>first stop logged</span><span><i class="k k-dot k-ink2"></i>last stop logged</span><span><i class="k k-line k-late"></i>later by the end</span><span><i class="k k-line k-early"></i>earlier by the end</span></div>
       <div class="chart" id="fig-startend"></div>
       <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-startend"></div></details>
     </figure>
-    <p>The late direction is the one leaving downtown. On 10 of the 17 bus routes that run to William Hudson Transit Center, buses leaving it are five or more minutes late at least ten points more often than buses heading toward it. Only 28 (Airport) and 40 (Stage &amp; Lauderdale) lean the other way.</p>
+    <p>The late direction is the one leaving downtown. On 11 of the 17 bus routes that run to William Hudson Transit Center, buses leaving it are five or more minutes late at least ten points more often than buses heading toward it; route 02 is late 40% of the time going out and 12% coming in. Only 28 (Airport) and 40 (Stage &amp; Lauderdale) lean the other way.</p>
     <figure>
       <span class="marginnote">Share of bus-polls five or more minutes late, toward and away from William Hudson Transit Center. Buses that reach downtown late turn around late. The trolley and routes that don&rsquo;t reach downtown are left out. <span class="tag">[direction]</span></span>
       <div class="legend"><span><i class="k k-line k-late"></i>worse leaving downtown, by 10+ points</span><span><i class="k k-line k-ran"></i>worse leaving, by less</span><span><i class="k k-line k-early"></i>worse heading downtown</span></div>
       <div class="chart" id="fig-direction"></div>
       <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-direction"></div></details>
     </figure>
-    <p>Through the day, lateness builds in the morning and peaks in the afternoon <span class="spark" id="spark-late"></span>. From 15:00 to 17:59 more than a quarter of bus-polls run five minutes late. After 21:00 the problem reverses and buses run early, 27% of polls at 21:00 and 40% at 22:00, which points to evening timetables with too much time in them.</p>
+    <p>Through a weekday, lateness builds in the morning and peaks in the afternoon <span class="spark" id="spark-late"></span>. From 15:00 to 17:59, 27 to 28% of bus-polls run five minutes late, against 9 to 12% before 7&nbsp;a.m. Saturdays have no rush hour, 13 to 23% all day, and Sundays stay at 5 to 14%. After 20:00 the problem reverses and buses run early: 32% of weekday polls at 22:00, which points to evening timetables with too much time in them.</p>
     <figure>
-      <span class="marginnote">Share of bus-polls five or more minutes late and two or more minutes early, by hour, both days, every route. <span class="tag">[hour]</span></span>
-      <div class="legend"><span><i class="k k-line k-late"></i>5+ min late</span><span><i class="k k-line k-early"></i>2+ min early</span></div>
+      <span class="marginnote">Share of bus-polls five or more minutes late and two or more minutes early, by hour, on weekdays, every route; with the late share on Saturdays and Sundays. <span class="tag">[hour]</span></span>
+      <div class="legend"><span><i class="k k-line k-late"></i>weekdays, 5+ min late</span><span><i class="k k-line k-early"></i>weekdays, 2+ min early</span><span><i class="k k-line k-ran"></i>Saturdays, 5+ min late</span><span><svg class="k" width="16" height="2" aria-hidden="true"><line x1="0" y1="1" x2="16" y2="1" stroke="var(--ran)" stroke-width="2" stroke-dasharray="4 3"/></svg>Sundays</span></div>
       <div class="chart" id="fig-hour"></div>
       <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-hour"></div></details>
     </figure>
     <h3>Route by route</h3>
     <figure class="fullwidth">
       <div class="chart" id="fig-multiples"></div>
-      <figcaption>Share of bus-polls five or more minutes late, by hour, one panel per route on the same scale, from the latest route overall. The band marks 15:00 to 17:59; the dot marks each route&rsquo;s worst hour. <span class="tag">[hour]</span></figcaption>
+      <figcaption>Share of weekday bus-polls five or more minutes late, by hour, one panel per route on the same scale, from the latest route on weekdays. The band marks 15:00 to 17:59; the dot marks each route&rsquo;s worst hour. <span class="tag">[hour]</span></figcaption>
       <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-multiples"></div></details>
     </figure>
   </section>
 
   <section id="where">
     <h2>Where the time goes</h2>
-    <p>Adding up the delay each bus gains between consecutive stops shows where the minutes go. The largest single loss is route 36 around the American Way Transit Center, about three minutes a pass at American Way and Getwell in both directions. Route 42 loses time stop after stop on Cleveland and Bellevue, and route 50 along Poplar.</p>
+    <p>Adding up the lateness each bus gains between consecutive stops shows where the minutes go. The largest single loss is route 36 leaving the American Way Transit Center, nearly three minutes a pass at American Way and Getwell, 46 bus-minutes a day. Route 42 loses time on Cleveland, route 01 on Tillman, and route 50 along Poplar.</p>
     <figure>
-      <div class="marginnote" id="where-list"><span>Bus-minutes lost per day, where buses gain the most delay. <span class="tag">[where]</span></span></div>
-      <div class="legend"><span><i class="k k-dot k-late"></i>delay gained, circle area &prop; bus-minutes per day</span><span><i class="k k-line k-ink"></i>slowest stretches</span><span><svg class="k" width="10" height="10" aria-hidden="true"><rect x="1.5" y="1.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>transit centers</span></div>
+      <div class="marginnote" id="where-list"><span>Bus-minutes lost per day, where buses gain the most lateness. An early bus waiting at a timepoint gains none. <span class="tag">[where]</span></span></div>
+      <div class="legend"><span><i class="k k-dot k-late"></i>lateness gained, circle area &prop; bus-minutes per day</span><span><i class="k k-line k-ink"></i>slowest stretches</span><span><svg class="k" width="10" height="10" aria-hidden="true"><rect x="1.5" y="1.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>transit centers</span></div>
       <div class="chart" id="fig-map"></div>
       <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-map"></div></details>
     </figure>
-    <p>The slowest stretches, measured stop to stop over at least 300 metres, include the time spent at the far stop:</p>
+    <p>The slowest stretches, measured stop to stop along the route over at least 300 metres, include the time spent at the far stop, and leaving a transit center includes the time a bus waits there:</p>
     <div class="block"><div class="scroll" id="slow-table"></div></div>
+  </section>
+
+  <section id="drivers">
+    <h2>Changing drivers</h2>
+    <p>No feed says who is driving, but MATA&rsquo;s timetable chains trips into blocks, the day&rsquo;s work for one bus. On weekdays 47 of its 56 blocks run more than ten hours, a median of 15.7, without an hour&rsquo;s break, and on most days one bus works its block from start to finish. Somewhere along the way a second driver has to take over a bus that is still in service.</p>
+    <p><span class="marginnote">Blocks come from MATA&rsquo;s timetable in force from 5 October; their trip IDs are the same as in September. Route 42 passes are counted from 25 September, when trip IDs start. <span class="tag">[relief]</span></span>Most of those handovers leave no trace in the data. Route 42 is the exception. Heading south on Watkins Street it passes MATA&rsquo;s garage at Levee Road, and on one trip of each long block the bus stops there for several minutes, on the same trip at the same time every weekday. Saturdays have one stop per block as well. On Sundays, when no block runs longer than ten hours, the bus never stops there.</p>
+    <figure class="fullwidth">
+      <div class="legend"><span><i class="k k-dot k-late"></i>trip with a driver change</span><span><i class="k k-dot k-ran"></i>other trips</span><span><i class="k k-line k-ink2"></i>usual pass</span></div>
+      <div class="chart" id="fig-relief"></div>
+      <figcaption>Minutes each southbound route 42 bus spent within 450 metres of the garage, by the time it got there, one dot per trip per day. Labels give the time each driver-change trip leaves Frayser. <span class="tag">[relief]</span></figcaption>
+      <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-relief"></div></details>
+    </figure>
+    <p>Each change costs about five minutes. The bus reaches the garage on time, waits a median of 8.6 minutes where other trips take 2.2, and leaves five minutes late with about five riders aboard. Riders further down the line meet it some three minutes late at the next timepoints, where other trips are on time, and the timetable&rsquo;s slack absorbs the rest by Airways Transit Center.</p>
+    <div class="block"><div class="scroll" id="relief-table"></div><p class="note">Weekday trips on which route 42 changes drivers: when the bus leaves Frayser and typically reaches the garage, its median minutes there and minutes of delay gained, and the days it stopped. A day counts when the bus spent three or more minutes longer than usual at the garage, gained three or more minutes of delay there and left at least two minutes late.</p></div>
+    <p><span class="marginnote">When a block switches to a different bus in the middle of the day, about eleven times a weekday across the network, that trip leaves its first stop a median of 9.1 minutes late, against 4.0 for the rest.</span>Route 08 also passes the garage and never stops there, so its drivers change somewhere else. On most routes the handover probably happens during the layover at the end of the line, where it looks like any other layover. Long stops in mid-route are no guide, since they are as common on Sundays as on weekdays. Departures from the end of the line give a hint. On weekday blocks of fourteen hours or more, 24 to 33% of departures five to nine hours into the block leave seven or more minutes later than a late arrival would explain, against 15 to 17% one or two hours in and 5 to 13% on Sundays. Time of day is mixed up in that, so it falls short of a measurement.</p>
   </section>
 
   <section id="wait">
     <h2>Waiting at the stop</h2>
-    <p>Put lateness and missing trips together from a rider&rsquo;s side. Arrive at a timepoint two minutes before the timetable says, and wait for the next bus of that route. The median wait is 4.9 minutes. On routes that lost trips it is far longer: 48 minutes on route 69, 25 on route 02, 15 on route 01.</p>
+    <p>Put lateness and missing trips together from a rider&rsquo;s side. Arrive at a timepoint two minutes before the timetable says, and wait for the next bus of that route. The median wait is 4.3 minutes, but 16% of waits pass a quarter of an hour, and 3% of the time no bus comes for the rest of the day. The trolley is worst: it runs hourly and often leaves Main and Madison early, so a rider who comes on time usually waits for the next one. Then come the routes that lost trips, 02, 01 and 53.</p>
     <figure>
-      <span class="marginnote">Waits at mid-route timepoints: median (dot), middle half (thick line) and 90th percentile (end of thin line), on a logarithmic scale. Red rows are routes where two waits in five or more exceed fifteen minutes. The trolley&rsquo;s row rests on only 52 timetabled calls. <span class="tag">[stop_wait]</span></span>
+      <span class="marginnote">Waits at mid-route timepoints: median (dot), middle half (thick line) and 90th percentile (end of thin line), on a logarithmic scale. Red rows are routes where two waits in five or more exceed fifteen minutes. <span class="tag">[stop_wait]</span></span>
       <div class="chart" id="fig-wait"></div>
       <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-wait"></div></details>
     </figure>
-    <p>MATA&rsquo;s countdowns are accurate close in and optimistic further out <span class="spark" id="spark-predict"></span>. Within five minutes of a prediction, 87% of buses come within two minutes of it. Twenty to forty minutes ahead, 41% do, and 42% come a minute or more earlier than predicted. A rider who times a walk to a twenty-minute countdown will often find the bus gone.</p>
+    <p>MATA&rsquo;s countdowns are accurate close in and optimistic further out <span class="spark" id="spark-predict"></span>. Within five minutes of a prediction, 87% of buses come within two minutes of it. Twenty to forty minutes ahead, 43% do, and 42% come a minute or more earlier than predicted. A rider who times a walk to a twenty-minute countdown will often find the bus gone.</p>
     <figure>
-      <span class="marginnote">Actual minus predicted time at the stop, by how far ahead the prediction was made: median (line), middle half (inner band) and middle 80% (outer band). Below, the share of predictions that came within two minutes. 250,024 predictions for trips with a bus on them, Friday. <span class="tag">[predict]</span></span>
+      <span class="marginnote">Actual minus predicted time at the stop, by how far ahead the prediction was made: median (line), middle half (inner band) and middle 80% (outer band). Below, the share of predictions that came within two minutes. 2.7 million predictions for trips with a bus on them, eleven days. <span class="tag">[predict]</span></span>
       <div class="legend"><span><i class="k k-line k-ink"></i>median</span><span><i class="k k-sq k-band2"></i>middle half</span><span><i class="k k-sq k-band"></i>middle 80%</span></div>
       <div class="chart" id="fig-predict"></div>
       <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-predict"></div></details>
@@ -317,35 +343,35 @@ footer code { font-family: inherit; font-variant-caps: all-small-caps; letter-sp
 
   <section id="full">
     <h2>How full the buses run</h2>
-    <p>The tracker reports each bus&rsquo;s load as a percentage of fifty riders, so the riders on board are that figure halved. On Thursday the network carried 4,064 rider-hours and at least 8,077 boardings <span class="spark" id="spark-riders"></span>, close to the 7,700 a day MATA reported for September 2023. The busiest moment on both days was 15:40, with 451 and 423 riders aboard.</p>
+    <p>The tracker reports each bus&rsquo;s load as a percentage of fifty riders, so the riders on board are that figure halved. A weekday carries 3,800 to 4,500 rider-hours and at least 7,900 to 9,400 boardings <span class="spark" id="spark-riders"></span>, a Saturday about 60% of that and a Sunday about a third. Over a week that is about 7,300 boardings a day, close to the 7,700 a day MATA reported for September 2023.</p>
     <figure>
-      <span class="marginnote">Riders on board every bus in service, five-minute averages. The single busiest polls, both at 15:40, had 451 riders aboard on Thursday and 423 on Friday. <span class="tag">[riders_day]</span></span>
-      <div class="legend"><span><i class="k k-line k-ran"></i>Thursday</span><span><i class="k k-line k-ink"></i>Friday, to 20:20</span></div>
+      <span class="marginnote">Riders on board every bus in service, five-minute averages drawn as fifteen-minute rolling means: the average weekday, with the range across the eight weekdays shaded, and the average Saturday and Sunday. The single busiest polls had 456 riders aboard, at 15:46 on Wednesday 30 September. <span class="tag">[riders_day]</span></span>
+      <div class="legend"><span><i class="k k-line k-ink"></i>average weekday</span><span><i class="k k-sq k-band"></i>weekday range</span><span><i class="k k-line k-ran"></i>Saturdays</span><span><svg class="k" width="16" height="2" aria-hidden="true"><line x1="0" y1="1" x2="16" y2="1" stroke="var(--ran)" stroke-width="2" stroke-dasharray="4 3"/></svg>Sundays</span></div>
       <div class="chart" id="fig-riders"></div>
       <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-riders"></div></details>
     </figure>
-    <p>The fleet was short most of the day. Against the trips the timetable had in progress, the tracker usually saw about four fewer buses on the road, and as many as thirteen fewer.</p>
+    <p>The fleet runs short. Against the trips the timetable has in progress, the tracker usually sees about five fewer buses on a weekday, from the morning to the evening, and as many as seven fewer. Saturdays run close to the timetable, and Sundays a few buses short.</p>
     <figure>
-      <span class="marginnote">Trips in progress according to the timetable, and buses in service, every fifteen minutes. Shaded where the buses fell short. <span class="tag">[fleet]</span></span>
+      <span class="marginnote">Trips in progress according to the timetable, and buses in service, every fifteen minutes, averaged over the weekdays, Saturdays and Sundays. Shaded where the buses fell short. <span class="tag">[fleet]</span></span>
       <div class="legend"><span><i class="k k-line k-ran"></i>trips in progress</span><span><i class="k k-line k-ink"></i>buses in service</span><span><i class="k k-sq" style="background:var(--late-wash)"></i>short</span></div>
       <div class="chart" id="fig-fleet"></div>
       <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-fleet"></div></details>
     </figure>
-    <p>Buses are seldom crowded. Average loads run from 1 to 11 riders, and the 95th percentile tops out at 29, on route 50. Every seat of a 40-foot bus was taken on only three routes, and every reading of 96% or more was route 50 heading out to Exeter Road between 08:40 and 13:10.</p>
+    <p>Buses are seldom crowded. Average loads run from 1.7 to 9.9 riders, and the 95th percentile tops out at 27, on route 50. Every seat of a 40-foot bus was taken on 0.9% of route 50&rsquo;s bus-polls and 0.2% of route 42&rsquo;s; route 39&rsquo;s share is one bus whose counter stuck at full for most of an hour.</p>
     <figure>
       <span class="marginnote">Riders on board, per bus-poll: median (dot), middle half (thick line), 95th percentile (end of thin line) and maximum (tick). A 40-foot bus seats 40, and MATA plans for at most 48. <span class="tag">[load]</span></span>
       <div class="chart" id="fig-loads"></div>
       <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-loads"></div></details>
     </figure>
-    <p><span class="marginnote" id="board-list"><span>Where riders board: net riders on per day. The first stops out of the transit centers lead. <span class="tag">[boardings]</span></span></span>Within a route, fuller buses run later. On route 50, 46% of polls with twenty or more riders were five minutes late, against 16% with fewer than ten; on route 08, 58% against 26%. Boarding time may be the cause, or late buses may collect more waiting riders; the data can&rsquo;t tell which. Across routes the busiest are not especially late: the correlation is 0.19.</p>
+    <p><span class="marginnote" id="board-list"><span>Where riders board: net riders on per weekday. Riders boarding at William Hudson Transit Center count under the first stop out, Second &amp; Jackson and Second &amp; Market. <span class="tag">[boardings]</span></span></span>Within a route, fuller buses run later. On route 50, 36% of polls with twenty or more riders were five minutes late, against 14% with fewer than ten; on route 08, 34% against 17%. Boarding time may be the cause, or late buses may collect more waiting riders; the data can&rsquo;t tell which. Across routes the busiest are not especially late: the correlation is 0.15.</p>
   </section>
 
   <section id="routes">
     <h2>Every route</h2>
-    <p>One row per route, both days together. Select a column heading to sort.</p>
+    <p>One row per route, all twelve days together. Select a column heading to sort.</p>
     <figure class="fullwidth">
       <div class="scroll" id="route-table"></div>
-      <figcaption>Never ran: trips that never ran, of those scheduled Thursday and Friday (Friday to 19:50). On time, late and early: shares of bus-polls. Left on time: Friday departures from the first stop, from MATA&rsquo;s feed. Wait: median at mid-route timepoints. Riders: average on board, with the 95th percentile. <span class="tag">[q1] [missed] [depart] [stop_wait] [load]</span></figcaption>
+      <figcaption>Never ran: trips that never ran, of those scheduled. On time, late and early: shares of bus-polls, all days and on weekdays alone, since Sundays are quieter and not every route runs then. Left on time: departures from the first stop, from MATA&rsquo;s feed. Wait: median at mid-route timepoints. Riders: average on board, with the 95th percentile. <span class="tag">[q1] [missed] [depart] [stop_wait] [load]</span></figcaption>
     </figure>
   </section>
 
@@ -353,7 +379,7 @@ footer code { font-family: inherit; font-variant-caps: all-small-caps; letter-sp
     <h2>How the numbers were checked</h2>
     <p>The tracker gives each bus&rsquo;s position, delay, next stop and load every ten seconds, with no trip ID and no timestamp of its own. A few checks decide what that data can carry.</p>
     <h3>The load figure counts riders</h3>
-    <p>All 351,576 load readings are even numbers, and together they cover every even value from 0 to 100. The vendor divides a rider count by 50 for every vehicle; a capacity that varied from bus to bus would produce odd percentages.</p>
+    <p>All 2,217,873 load readings are even numbers, and together they cover every even value from 0 to 100. The vendor divides a rider count by 50 for every vehicle; a capacity that varied from bus to bus would produce odd percentages.</p>
     <figure>
       <span class="marginnote">Readings at each load percentage, on a square-root scale. Odd values never occur.</span>
       <div class="chart" id="fig-comb"></div>
@@ -361,28 +387,28 @@ footer code { font-family: inherit; font-variant-caps: all-small-caps; letter-sp
     </figure>
     <p>MATA&rsquo;s feed also reports load, as a category. Matched to the tracker&rsquo;s reading from the same report, the categories turn out to be fixed bands of that same count, and &ldquo;standing room only&rdquo; starts at about 11 riders, on a bus with 40 seats. They say nothing about free seats.</p>
     <figure>
-      <span class="marginnote">Riders on board for each category in MATA&rsquo;s feed: middle 90% of readings (line) and median (dot), 5,915 matched reports.</span>
+      <span class="marginnote">Riders on board for each category in MATA&rsquo;s feed: middle 90% of readings (line) and median (dot), 67,487 matched reports.</span>
       <div class="chart" id="fig-cats"></div>
       <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-cats"></div></details>
     </figure>
     <h3>Speed is in metres per second</h3>
-    <p>For 2,751 moving buses reported by both feeds at the same position, the tracker&rsquo;s speed equals the official feed&rsquo;s metres-per-second value 97% of the time. Distance covered over five-minute windows agrees, at 1.03 times speed multiplied by time.</p>
+    <p>For 33,269 moving buses reported by both feeds at the same position, the tracker&rsquo;s speed equals the official feed&rsquo;s metres-per-second value 97% of the time. Distance covered over five-minute windows agrees, at 1.03 times speed multiplied by time.</p>
     <figure>
       <span class="marginnote">Matched reports by tracker speed and official speed; circle area &prop; count among moving buses. Nearly every report sits on the diagonal; the red ones off it disagree.</span>
       <div class="chart" id="fig-speed"></div>
       <details class="tv"><summary>Table</summary><div class="tv-wrap" id="tv-speed"></div></details>
     </figure>
     <h3>Stuck positions are mostly buses waiting</h3>
-    <p>A bus whose coordinates stop changing is either parked or carrying a tracker that has stopped reporting. How the still stretch ends tells the two apart: a parked bus drives off from the same spot, while a dead tracker reappears somewhere else. Long still stretches are layovers and holds. Dead trackers are short, and one bus, 458, accounts for nearly half of all the rows they leave behind.</p>
-    <div class="block"><div class="scroll" id="ghost-table"></div><p class="note">Still stretches of six polls or more, by how they ended. The few not counted in a column were still under way when this snapshot ended.</p></div>
-    <p>They barely matter for delay, because the vendor freezes the delay along with the position. Dropping them, instead of long still stretches, moves no route&rsquo;s late share by more than 1.4 points.</p>
+    <p>A bus whose coordinates stop changing is either parked or carrying a tracker that has stopped reporting. How the still stretch ends tells the two apart: a parked bus drives off from the same spot, while a dead tracker reappears somewhere else. Long still stretches are layovers and holds. Dead trackers are short, and one bus, 458, accounts for a quarter of all the rows they leave behind.</p>
+    <div class="block"><div class="scroll" id="ghost-table"></div><p class="note">Still stretches of six polls or more, by how they ended. The few not counted in a column were still under way when this copy of the data was taken.</p></div>
+    <p>They barely matter for delay, because the vendor freezes the delay along with the position. Dropping them, instead of long still stretches, moves no route&rsquo;s late share by more than 1.5 points.</p>
     <h3>Trips, stops and the ends of lines</h3>
-    <p>The tracker names no trip, so each bus is matched to the timetable trip due at its next stop. Checked against 60,662 reports in MATA&rsquo;s feed, the match agrees 99.8% of the times it names a trip, and it names none 2.6% of the time, mostly between trips. The log of when buses serve stops catches 84% of the stops on a trip that ran. At the end of a line the tracker still shows the finished trip&rsquo;s destination as the bus leaves, so departures there are timed from MATA&rsquo;s feed instead.</p>
+    <p>The tracker names no trip, so each bus is matched to the timetable trip due at its next stop. Checked against 649,355 reports in MATA&rsquo;s feed, the match agrees 99.8% of the times it names a trip, leaving out trips MATA&rsquo;s dispatchers add that are in no timetable, and it names none 2.3% of the time, mostly between trips. The log of when buses serve stops catches 87% of the stops on a trip that ran. At the end of a line the tracker still shows the finished trip&rsquo;s destination as the bus leaves, so departures there are timed from MATA&rsquo;s feed instead.</p>
     <h3>Not yet answerable</h3>
-    <p>Weekday against weekend, weather and events need weeks of data. The effect of detours needs the poller&rsquo;s new detour log to run for weeks. The minute window MATA uses for its own on-time figures isn&rsquo;t published; this page uses the usual one, at most one minute early and five minutes late.</p>
+    <p>Twelve days tell weekdays from weekends, but one or two of each weekday can&rsquo;t rank Monday against Friday; that, weather and events need weeks more. The poller&rsquo;s detour log holds 19 detours so far, most a few hours long around two downtown events, too few to measure their effect. The minute window MATA uses for its own on-time figures isn&rsquo;t published; this page uses the usual one, at most one minute early and five minutes late.</p>
   </section>
 
-  <footer>Code, queries and the written findings: <a href="https://github.com/jpbranson/mata-scraper-claude">github.com/jpbranson/mata-scraper-claude</a> (<code>knowledge/findings/</code>, <code>analysis.sql</code>). Bracketed tags name the query behind each graphic. Snapshot of Friday 25 September 2026, 20:21 Central.</footer>
+  <footer>Code, queries and the written findings: <a href="https://github.com/jpbranson/mata-scraper-claude">github.com/jpbranson/mata-scraper-claude</a> (<code>knowledge/findings/</code>, <code>analysis.sql</code>). Bracketed tags name the query behind each graphic. Data copied Monday 5 October 2026 at 22:37 Central, after that day&rsquo;s service.</footer>
 </article>
 
 <div id="tip" hidden aria-hidden="true"></div>
@@ -393,8 +419,12 @@ footer code { font-family: inherit; font-variant-caps: all-small-caps; letter-sp
 "use strict";
 const D = JSON.parse(document.getElementById("page-data").textContent);
 const NS = "http://www.w3.org/2000/svg";
-const DAYS = ["2026-09-24", "2026-09-25"];
-const DAYNAME = { "2026-09-24": "Thursday", "2026-09-25": "Friday" };
+const DAYTYPES = [["weekday", "Weekdays"], ["sat", "Saturdays"], ["sun", "Sundays"]];
+const dayDate = d => new Date(d + "T12:00:00");
+const dayShort = d => dayDate(d).toLocaleDateString("en-US", { weekday: "short" }).slice(0, 2);
+const dayLong = d => dayDate(d).toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "long" });
+const isWeekend = d => [0, 6].includes(dayDate(d).getDay());
+const FEED_FROM = D.meta.official_first.slice(0, 10);
 const NAME = D.route_names || {};
 
 /* ---------- small helpers ---------- */
@@ -528,74 +558,98 @@ function spark(id, pts, opt) {
   for (const i of opt.dots) mk("circle", { cx: x(pts[i][0]), cy: y(pts[i][1]), r: 2, class: opt.dotCls || "f-late" }, s);
 }
 {
-  const mh = D.missed_hour.filter(r => r[0] <= 19).map(r => [r[0], r[2] / r[1]]);
-  const mi = mh.reduce((b, p, i) => p[1] > mh[b][1] ? i : b, 0);
-  spark("spark-missed", mh, { dots: [mi] });
-  const lh = D.hour.map(r => [r.h, r.late]);
-  spark("spark-late", lh, { dots: [lh.reduce((b, p, i) => p[1] > lh[b][1] ? i : b, 0)] });
+  const argmax = a => a.reduce((b, p, i) => p[1] > a[b][1] ? i : b, 0);
+  const mh = (D.missed_hour.weekday || []).filter(r => r[1] >= 40).map(r => [r[0], r[2] / r[1]]);
+  spark("spark-missed", mh, { dots: [argmax(mh)] });
+  const lh = D.hour.weekday.map(r => [r.h, r.late]);
+  spark("spark-late", lh, { dots: [argmax(lh)] });
   const pr = D.predict.map(r => [r.lead, r.within2]);
   spark("spark-predict", pr, { dots: [0, pr.length - 1], dotCls: "f-ink2" });
-  const rc = D.riders_curve["2026-09-24"].map(r => [r[0], r[1]]);
-  spark("spark-riders", rc, { w: 76, dots: [rc.reduce((b, p, i) => p[1] > rc[b][1] ? i : b, 0)], dotCls: "f-ink" });
+  const rh = D.riders_day.map((r, i) => [i, r.rider_hours]);
+  spark("spark-riders", rh, { w: 76, dots: rh.map((p, i) => i).filter(i => dayDate(D.riders_day[i].day).getDay() === 0), dotCls: "f-ink2" });
 }
 
-/* ---------- missed trips: the timetable barcode ---------- */
-add("fig-barcode", (host, W) => {
-  const by = {}, routes = [];
-  for (const [day, r, m, ran, canc, head] of D.barcode) {
-    (by[r + "|" + day] || (by[r + "|" + day] = [])).push({ m, ran, canc, head });
-    if (!routes.includes(r)) routes.push(r);
+/* ---------- missed trips: route by day ---------- */
+add("fig-missed", (host, W) => {
+  const days = D.days.map(d => d.day), cell = {}, tot = {};
+  for (const [r, day, n, never, canc] of D.missed_grid) {
+    if (!days.includes(day)) continue;
+    cell[r + "|" + day] = { n, never, canc };
+    const t = tot[r] || (tot[r] = { n: 0, never: 0, canc: 0 });
+    t.n += n; t.never += never; t.canc += canc;
   }
-  const share = r => { let n = 0, k = 0; for (const d of DAYS) for (const t of by[r + "|" + d] || []) { n++; if (!t.ran) k++; } return n ? k / n : 0; };
-  routes.sort((a, b) => share(b) - share(a) || +a - +b);
-  const side = W >= 700, gap = 30, pw = side ? (W - gap) / 2 : W;
-  const rowH = 14, top = 30, labW = 28, cntW = 50, ph = top + routes.length * rowH + 22;
-  const H = side ? ph : ph * 2 + 18;
-  const s = svgIn(host, W, H, "Scheduled trips by route and departure time, Thursday and Friday; red ticks are trips that never ran");
-  const cutoff = toMin(D.missed_days[1].due_by);
-  DAYS.forEach((day, di) => {
-    const ox = side ? di * (pw + gap) : 0;
-    const g = mk("g", { transform: `translate(${ox},${side ? 0 : di * (ph + 18)})` }, s);
-    const x0 = labW, x1 = pw - cntW, x = lin(240, 1380, x0, x1), yb = top + routes.length * rowH;
-    tx(g, x0, 14, DAYNAME[day], "t-ink t-it t-lg");
-    tx(g, pw, 14, "never ran", "t-sm t-it", "end");
-    for (const h of [6, 9, 12, 15, 18, 21]) { vline(g, x(h * 60), top - 4, yb, "grid"); tx(g, x(h * 60), yb + 15, hourLabel(h), "", "middle"); }
-    if (di === 1 && cutoff < 1380) {
-      mk("rect", { x: x(cutoff), y: top - 4, width: x1 - x(cutoff), height: yb - top + 4, class: "unknown" }, g);
-      tx(g, x1, top - 8, "not yet counted", "t-sm t-it", "end");
-    }
-    routes.forEach((r, ri) => {
-      const y = top + ri * rowH, trips = by[r + "|" + day] || [];
-      tx(g, labW - 6, y + rowH - 3.5, r, "t-ink2", "end");
-      for (const t of trips) if (t.ran) mk("line", { x1: x(t.m), x2: x(t.m), y1: y + 3, y2: y + rowH - 2, class: "tk-ran" }, g);
-      let k = 0;
-      for (const t of trips) if (!t.ran) {
-        k++;
-        mk("line", { x1: x(t.m), x2: x(t.m), y1: y + 1.5, y2: y + rowH - .5, class: "tk-miss" }, g);
-        if (t.canc) mk("circle", { cx: x(t.m), cy: y + 1.5, r: 2.2, class: "f-late ring", style: "stroke-width:1" }, g);
-      }
-      tx(g, pw, y + rowH - 3.5, trips.length ? k + "/" + trips.length : "", k ? "t-ink" : "", "end");
-      const hit = mk("rect", { x: 0, y, width: pw, height: rowH, class: "hit clear", tabindex: 0, "aria-label": `Route ${r}, ${DAYNAME[day]}: ${k} of ${trips.length} trips never ran` }, g);
-      hover(hit, e => {
-        const title = `Route ${r} ${routeName(r)} · ${DAYNAME[day]}`;
-        const sum = { v: `${k} of ${trips.length}`, l: "trips never ran this day" };
-        if (!e || e.clientX == null || e.type === "focus") return [title, [sum]];
-        const px = e.clientX - s.getBoundingClientRect().left - ox;
-        let best = null, bd = 1e9;
-        for (const t of trips) { const d = Math.abs(x(t.m) - px); if (d < bd) { bd = d; best = t; } }
-        if (!best || bd > 12) return [title, [sum]];
-        return [title, [
-          { v: hhmm(best.m), l: "due to leave, to " + nice(best.head) },
-          best.ran ? { v: "ran", key: "ran" } : { v: "never ran", l: best.canc ? "marked canceled in MATA’s feed" : "not marked canceled", key: "late" },
-          sum]];
-      });
+  const routes = Object.keys(tot).sort((a, b) => tot[b].never / tot[b].n - tot[a].never / tot[a].n || +a - +b);
+  const wide = W >= 520, labW = 30, cntW = wide ? 96 : 40, top = 34, rowH = 15;
+  const cw = (W - labW - cntW - 8) / days.length, H = top + routes.length * rowH + 6;
+  const s = svgIn(host, W, H, "Share of each route's scheduled trips that never ran, by route and day");
+  const shade = sh => .18 + .82 * Math.min(1, sh / .4);
+  days.forEach((d, i) => {
+    const cx = labW + i * cw + cw / 2;
+    if (isWeekend(d)) mk("rect", { x: labW + i * cw, y: 0, width: cw, height: H, class: "band" }, s);
+    tx(s, cx, 12, dayShort(d), isWeekend(d) ? "t-sm t-it" : "t-sm", "middle");
+    tx(s, cx, 26, String(+d.slice(8)), "t-sm t-ink2", "middle");
+  });
+  tx(s, W, 26, wide ? "never ran" : "", "t-sm t-it", "end");
+  routes.forEach((r, ri) => {
+    const y = top + ri * rowH, t = tot[r];
+    tx(s, labW - 6, y + rowH - 3.5, r, "t-ink2", "end");
+    days.forEach((d, i) => {
+      const c = cell[r + "|" + d];
+      if (!c || !c.n) return;
+      const rx = labW + i * cw + 1, rw = Math.max(1, cw - 2);
+      if (c.never) mk("rect", { x: rx, y: y + 1, width: rw, height: rowH - 2, class: "f-late", style: `fill-opacity:${shade(c.never / c.n).toFixed(2)}` }, s);
+      else mk("rect", { x: rx, y: y + rowH / 2 - .5, width: rw, height: 1, class: "f-ran" }, s);
+    });
+    tx(s, W, y + rowH - 3.5, wide ? `${t.never} of ${t.n} · ${pct(t.never / t.n)}` : pct(t.never / t.n), t.never / t.n >= .15 ? "t-ink" : "", "end");
+    const hit = mk("rect", { x: 0, y, width: W, height: rowH, class: "hit clear", tabindex: 0, "aria-label": `Route ${r}: ${t.never} of ${t.n} trips never ran` }, s);
+    hover(hit, e => {
+      const title = `Route ${r} ${routeName(r)}`;
+      const sum = [{ v: `${t.never} of ${t.n}`, l: "trips never ran, all days" }];
+      if (!e || e.clientX == null || e.type === "focus") return [title, sum];
+      const i = Math.floor((e.clientX - s.getBoundingClientRect().left - labW) / cw);
+      if (i < 0 || i >= days.length) return [title, sum];
+      const d = days[i], c = cell[r + "|" + d];
+      if (!c || !c.n) return [`${title} · ${dayLong(d)}`, [{ v: "no service", l: "this day" }]];
+      return [`${title} · ${dayLong(d)}`, [
+        { v: `${c.never} of ${c.n}`, l: "trips never ran", key: c.never ? "late" : "ran" },
+        d < FEED_FROM ? { v: "–", l: "no official feed this day" } : { v: String(c.canc), l: "marked canceled in MATA’s feed" }]];
     });
   });
-  table("tv-barcode", ["Route", "Name", "Thu scheduled", "Thu never ran", "Fri scheduled", "Fri never ran", "Fri marked canceled"],
-    routes.map(r => {
-      const a = by[r + "|" + DAYS[0]] || [], b = by[r + "|" + DAYS[1]] || [];
-      return [r, routeName(r), a.length, a.filter(t => !t.ran).length, b.length, b.filter(t => !t.ran).length, b.filter(t => !t.ran && t.canc).length];
-    }));
+  table("tv-missed", ["Route", "Name", "Scheduled", "Never ran", "Marked canceled"].concat(days.map(d => `${dayShort(d)} ${+d.slice(8)}`)),
+    routes.map(r => [r, routeName(r), tot[r].n, tot[r].never, tot[r].canc].concat(days.map(d => { const c = cell[r + "|" + d]; return c && c.n ? `${c.never}/${c.n}` : "–"; }))));
+});
+
+/* ---------- day by day ---------- */
+add("fig-days", (host, W) => {
+  const rows = D.days, m = { l: 36, r: 6, t: 24 }, ph = 92, gap = 40, H = m.t + ph + gap + ph + 40;
+  const s = svgIn(host, W, H, "Each day: the share of bus-polls five or more minutes late, and the share of scheduled trips that never ran");
+  const bw = (W - m.l - m.r) / rows.length, barW = Math.min(26, bw * .6);
+  rows.forEach((r, i) => { if (isWeekend(r.day)) mk("rect", { x: m.l + i * bw, y: m.t - 8, width: bw, height: 2 * ph + gap + 8, class: "band" }, s); });
+  const panels = [
+    { v: r => r.late, max: .3, top: m.t, title: "bus-polls 5+ minutes late", ticks: [.1, .2, .3] },
+    { v: r => r.never / r.scheduled, max: .2, top: m.t + ph + gap, title: "scheduled trips that never ran", ticks: [.1, .2] }];
+  for (const P of panels) {
+    const y = lin(0, P.max, P.top + ph, P.top);
+    for (const t of P.ticks) { hline(s, m.l, W - m.r, y(t), "grid"); tx(s, m.l - 6, y(t) + 4, pct(t), "", "end"); }
+    hline(s, m.l, W - m.r, y(0), "base");
+    tx(s, m.l + 4, P.top - 12, P.title, "t-sm t-it t-ink2 halo");
+    rows.forEach((r, i) => {
+      const v = P.v(r), cx = m.l + i * bw + bw / 2;
+      mk("path", { d: colPath(cx - barW / 2, y(0), barW, y(Math.min(v, P.max)), 3), class: "f-late" }, s);
+      if (bw >= 34) tx(s, cx, y(Math.min(v, P.max)) - 5, pct(v), "t-sm t-ink2", "middle");
+    });
+  }
+  rows.forEach((r, i) => {
+    const cx = m.l + i * bw + bw / 2;
+    tx(s, cx, H - 22, dayShort(r.day), isWeekend(r.day) ? "t-sm t-it" : "t-sm", "middle");
+    tx(s, cx, H - 8, String(+r.day.slice(8)), "t-sm t-ink2", "middle");
+    const hit = mk("rect", { x: m.l + i * bw, y: m.t - 8, width: bw, height: 2 * ph + gap + 8, class: "hit", tabindex: 0, "aria-label": dayLong(r.day) }, s);
+    hover(hit, () => [dayLong(r.day), [
+      { v: pct(r.late), l: "of bus-polls 5+ min late", key: "late" },
+      { v: `${r.never} of ${r.scheduled}`, l: `trips never ran (${pct(r.never / r.scheduled)})` }]]);
+  });
+  table("tv-days", ["Day", "5+ min late", "Trips scheduled", "Never ran", "Share never ran"],
+    rows.map(r => [dayLong(r.day), pct(r.late), r.scheduled, r.never, pct(r.never / r.scheduled)]));
 });
 
 /* ---------- departures from the first stop ---------- */
@@ -705,45 +759,54 @@ add("fig-direction", (host, W) => {
 
 /* ---------- lateness by hour ---------- */
 add("fig-hour", (host, W) => {
-  const rows = D.hour, H = 250, m = { l: 36, r: 10, t: 18, b: 30 };
-  const s = svgIn(host, W, H, "Share of bus-polls late and early by hour of day");
+  const rows = D.hour.weekday, sat = D.hour.sat || [], sun = D.hour.sun || [], H = 250, m = { l: 36, r: 34, t: 18, b: 30 };
+  const s = svgIn(host, W, H, "Share of bus-polls late and early by hour of day, weekdays, with Saturdays and Sundays");
   const x = lin(4, 23, m.l, W - m.r), y = lin(0, .45, H - m.b, m.t);
   mk("rect", { x: x(15), y: m.t, width: x(18) - x(15), height: H - m.b - m.t, class: "band" }, s);
   for (const t of [.1, .2, .3, .4]) { hline(s, m.l, W - m.r, y(t), "grid"); tx(s, m.l - 6, y(t) + 4, pct(t), "", "end"); }
   hline(s, m.l, W - m.r, y(0), "base");
   tx(s, m.l - 6, y(0) + 4, "0", "", "end");
   for (const h of [6, 9, 12, 15, 18, 21]) tx(s, x(h), H - m.b + 16, hourLabel(h), "", "middle");
-  const L = rows.map(r => [x(r.h + .5), y(r.late)]), E = rows.map(r => [x(r.h + .5), y(r.early)]);
+  const line = (rs, f) => rs.map(r => [x(r.h + .5), y(f(r))]);
+  const Sa = line(sat, r => r.late), Su = line(sun, r => r.late);
+  if (Su.length) { mk("path", { d: linePath(Su), class: "l-ran", style: "stroke-dasharray:4 3" }, s); tx(s, Su[Su.length - 1][0] + 5, Su[Su.length - 1][1] + 4, "Sun", "t-sm t-ink2"); }
+  if (Sa.length) { mk("path", { d: linePath(Sa), class: "l-ran" }, s); tx(s, Sa[Sa.length - 1][0] + 5, Sa[Sa.length - 1][1] + 4, "Sat", "t-sm t-ink2"); }
+  const L = line(rows, r => r.late), E = line(rows, r => r.early);
   mk("path", { d: linePath(E), class: "l-early" }, s);
   mk("path", { d: linePath(L), class: "l-late" }, s);
   const li = rows.reduce((b, r, i) => r.late > rows[b].late ? i : b, 0), ei = rows.length - 1;
   mk("circle", { cx: L[li][0], cy: L[li][1], r: 4, class: "f-late ring" }, s);
-  tx(s, L[li][0], L[li][1] - 10, `${pct(rows[li].late)} at ${hourLabel(rows[li].h)}`, "t-ink2", "middle");
+  tx(s, L[li][0], L[li][1] - 10, `${pct(rows[li].late)} at ${hourLabel(rows[li].h)}`, "t-ink2 halo", "middle");
   mk("circle", { cx: E[ei][0], cy: E[ei][1], r: 4, class: "f-early ring" }, s);
-  tx(s, E[ei][0] - 8, E[ei][1] - 8, `${pct(rows[ei].early)} early at 10pm`, "t-ink2", "end");
+  tx(s, E[ei][0] - 8, E[ei][1] - 8, `${pct(rows[ei].early)} early at ${hourLabel(rows[ei].h)}`, "t-ink2 halo", "end");
   const xh = vline(s, -10, m.t, H - m.b, "xhair");
   xh.style.display = "none";
+  const at = (rs, h) => rs.find(r => r.h === h);
   const hit = mk("rect", { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.b - m.t, class: "hit clear", tabindex: 0, "aria-label": "Lateness by hour" }, s);
   hover(hit, e => {
     let r = rows[li];
     if (e && e.clientX != null && e.type !== "focus") {
       const px = e.clientX - s.getBoundingClientRect().left;
-      r = rows[clamp(Math.floor(4 + (px - m.l) / (W - m.l - m.r) * 19) - 4, 0, rows.length - 1)];
+      r = rows[clamp(Math.floor(4 + (px - m.l) / (W - m.l - m.r) * 19) - rows[0].h, 0, rows.length - 1)];
     }
     xh.style.display = "";
     xh.setAttribute("x1", Math.round(x(r.h + .5)) + .5);
     xh.setAttribute("x2", Math.round(x(r.h + .5)) + .5);
-    return [`${r.h}:00–${r.h}:59`, [{ v: pct(r.late), l: "5+ min late", key: "late" }, { v: pct(r.early), l: "2+ min early", key: "early" }, { v: r.polls.toLocaleString("en-US"), l: "bus-polls" }]];
+    const sa = at(sat, r.h), su = at(sun, r.h);
+    return [`${r.h}:00–${r.h}:59`, [{ v: pct(r.late), l: "5+ min late, weekdays", key: "late" }, { v: pct(r.early), l: "2+ min early, weekdays", key: "early" },
+      { v: sa ? pct(sa.late) : "–", l: "5+ min late, Saturdays", key: "ran" }, { v: su ? pct(su.late) : "–", l: "5+ min late, Sundays" },
+      { v: r.polls.toLocaleString("en-US"), l: "weekday bus-polls" }]];
   }, () => { xh.style.display = "none"; });
-  table("tv-hour", ["Hour", "5+ min late", "2+ min early", "Bus-polls"], rows.map(r => [`${r.h}:00`, pct(r.late), pct(r.early), r.polls]));
+  table("tv-hour", ["Hour", "Weekdays 5+ min late", "Weekdays 2+ min early", "Saturdays 5+ min late", "Sundays 5+ min late", "Weekday bus-polls"],
+    rows.map(r => { const sa = at(sat, r.h), su = at(sun, r.h); return [`${r.h}:00`, pct(r.late), pct(r.early), sa ? pct(sa.late) : null, su ? pct(su.late) : null, r.polls]; }));
 });
 
 /* ---------- small multiples by route ---------- */
 add("fig-multiples", (host, W) => {
-  const order = D.q1.map(q => q.route), late = Object.fromEntries(D.q1.map(q => [q.route, q.late]));
+  const order = D.q1.slice().sort((a, b) => b.late_wk - a.late_wk || +a.route - +b.route).map(q => q.route), late = Object.fromEntries(D.q1.map(q => [q.route, q.late_wk]));
   const cols = W >= 880 ? 5 : W >= 560 ? 4 : 3, gx = 16, gy = 14, cw = (W - gx * (cols - 1)) / cols, ch = 84;
   const rowsN = Math.ceil(order.length / cols), H = rowsN * ch + (rowsN - 1) * gy + 18;
-  const s = svgIn(host, W, H, "Small multiples: share of bus-polls late by hour, one panel per route");
+  const s = svgIn(host, W, H, "Small multiples: share of bus-polls late by hour on weekdays, one panel per route");
   order.forEach((r, i) => {
     const ox = (i % cols) * (cw + gx), oy = Math.floor(i / cols) * (ch + gy);
     const g = mk("g", { transform: `translate(${ox},${oy})` }, s);
@@ -767,13 +830,13 @@ add("fig-multiples", (host, W) => {
     const hit = mk("rect", { x: 0, y: 0, width: cw, height: ch, class: "hit clear", tabindex: 0, "aria-label": `Route ${r}` }, g);
     hover(hit, e => {
       const title = `Route ${r} ${routeName(r)}`;
-      if (!pts.length) return [title, [{ v: pct(late[r]), l: "5+ min late overall" }]];
+      if (!pts.length) return [title, [{ v: pct(late[r]), l: "5+ min late, all weekday" }]];
       let p = pts.reduce((b, q) => q[2] > b[2] ? q : b, pts[0]);
       if (e && e.clientX != null && e.type !== "focus") {
         const px = e.clientX - s.getBoundingClientRect().left - ox, hh = 4 + px / cw * 19;
         p = pts.reduce((b, q) => Math.abs(q[0] + .5 - hh) < Math.abs(b[0] + .5 - hh) ? q : b, pts[0]);
       }
-      return [title, [{ v: pct(p[2]), l: `5+ min late, ${p[0]}:00–${p[0]}:59`, key: "late" }, { v: pct(late[r]), l: "all day" }, { v: String(p[1]), l: "bus-polls that hour" }]];
+      return [title, [{ v: pct(p[2]), l: `5+ min late, weekdays ${p[0]}:00–${p[0]}:59`, key: "late" }, { v: pct(late[r]), l: "all weekday" }, { v: String(p[1]), l: "bus-polls that hour" }]];
     });
   });
   const hours = []; for (let h = 4; h <= 22; h++) hours.push(h);
@@ -885,6 +948,78 @@ add("fig-map", (host, W) => {
   host.appendChild(t);
 })();
 
+/* ---------- driver changes at the garage (route 42) ---------- */
+const RL = D.relief;
+const shortDate = d => new Date(d + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" });
+const median = a => { const v = a.slice().sort((p, q) => p - q), n = v.length; return n ? (n % 2 ? v[(n - 1) / 2] : (v[n / 2 - 1] + v[n / 2]) / 2) : null; };
+add("fig-relief", (host, W) => {
+  const panels = [["weekday", "Weekdays"], ["saturday", "Saturdays"], ["sunday", "Sundays"]];
+  const m = { l: 30, r: 10, t: 30, b: 6 }, ph = 128, gap = 16, H = panels.length * (ph + gap) - gap + 24;
+  const s = svgIn(host, W, H, "Minutes each southbound route 42 bus spent passing the garage, by time of day, on weekdays, Saturdays and Sundays; red dots are trips with a driver change");
+  const x = lin(4 * 60, 22 * 60, m.l, W - m.r);
+  const yMax = Math.max(15, Math.ceil(Math.max(...RL.passes.map(p => p[4])) / 5) * 5);
+  const big = W >= 520;
+  panels.forEach(([svc, label], pi) => {
+    const top = pi * (ph + gap), y = lin(0, yMax, top + ph - m.b, top + m.t);
+    const pts = RL.passes.filter(p => p[0] === svc);
+    const usual = median(pts.filter(p => !p[8]).map(p => p[4]));
+    const days = RL.days[svc], nChg = new Set(pts.filter(p => p[8]).map(p => p[2])).size;
+    tx(s, m.l, top + 13, label, "t-ink t-it t-lg");
+    tx(s, W - m.r, top + 13, `${days} days · ${nChg ? nChg + (nChg === 1 ? " driver change" : " driver changes") + " a day" : "no driver changes"}`, "t-sm t-it", "end");
+    for (let t = 5; t <= yMax; t += 5) { hline(s, m.l, W - m.r, y(t), "grid"); tx(s, m.l - 6, y(t) + 4, t, "", "end"); }
+    hline(s, m.l, W - m.r, y(0), "base");
+    tx(s, m.l - 6, y(0) + 4, "0", "", "end");
+    if (usual != null) mk("line", { x1: m.l, x2: W - m.r, y1: y(usual), y2: y(usual), class: "l-ink2", style: "stroke-width:1;stroke-dasharray:3 3" }, s);
+    for (const p of pts) if (!p[8]) mk("circle", { cx: x(p[3]), cy: y(p[4]), r: 3, class: "f-ran" }, s);
+    for (const p of pts) if (p[8]) mk("circle", { cx: x(p[3]), cy: y(p[4]), r: 3.6, class: "f-late ring", style: "stroke-width:1.2" }, s);
+    if (big && svc === "weekday") {
+      for (const tr of RL.trips.filter(t => t.service === svc)) {
+        const ps = pts.filter(p => p[8] && p[2] === tr.starts);
+        if (!ps.length) continue;
+        tx(s, x(median(ps.map(p => p[3]))), y(Math.max(...ps.map(p => p[4]))) - 9, tr.starts, "t-sm t-ink2 halo", "middle");
+      }
+    }
+    const hit = mk("rect", { x: m.l, y: top + m.t, width: W - m.r - m.l, height: ph - m.t - m.b, class: "hit clear", tabindex: 0,
+      "aria-label": `${label}: ${pts.length} passes of the garage, ${nChg} trips with a driver change` }, s);
+    hover(hit, e => {
+      const sum = { v: `${pts.filter(p => p[8]).length} of ${pts.length}`, l: "passes on trips with a driver change" };
+      if (!e || e.clientX == null || e.type === "focus") return [label, [sum]];
+      const b = s.getBoundingClientRect(), px = e.clientX - b.left, py = e.clientY - b.top;
+      let best = null, bd = 1e9;
+      for (const p of pts) { const d = Math.hypot(x(p[3]) - px, y(p[4]) - py); if (d < bd) { bd = d; best = p; } }
+      if (!best || bd > 14) return [label, [sum]];
+      return [`${shortDate(best[1])} · the ${best[2]} from Frayser`, [
+        { v: `${best[4].toFixed(1)} min`, l: `at the garage, from ${hhmm(best[3])}`, key: best[8] ? "late" : "ran" },
+        { v: best[5] == null || best[6] == null ? "–" : `${sgn(best[5], 0)} → ${sgn(best[6], 0)} min`, l: "late, arriving → leaving" },
+        { v: String(best[7]), l: "riders aboard" }]];
+    });
+  });
+  for (let h = 6; h <= 21; h += 3) tx(s, x(h * 60), H - 6, hourLabel(h), "", "middle");
+  table("tv-relief", ["Date", "Trip from Frayser", "At the garage", "Minutes there", "Late arriving (min)", "Late leaving (min)", "Riders", "Driver change trip"],
+    RL.passes.map(p => [shortDate(p[1]), p[2], hhmm(p[3]), p[4].toFixed(1), p[5], p[6], p[7], p[8] ? "yes" : "no"]));
+});
+(function reliefTable() {
+  const host = document.getElementById("relief-table");
+  if (!host) return;
+  const t = document.createElement("table"); t.className = "rt";
+  const hr = t.createTHead().insertRow();
+  for (const h of ["Leaves Frayser", "At the garage", "Minutes there", "Gained", "Days"]) { const th = document.createElement("th"); th.textContent = h; hr.appendChild(th); }
+  const tb = t.createTBody();
+  for (const tr of RL.trips.filter(t => t.service === "weekday")) {
+    const ps = RL.passes.filter(p => p[0] === "weekday" && p[8] && p[2] === tr.starts);
+    const r = tb.insertRow();
+    r.insertCell().textContent = tr.starts;
+    r.insertCell().textContent = hhmm(Math.round(median(ps.map(p => p[3]))));
+    const c2 = r.insertCell(); const cb = document.createElement("span"); cb.className = "cb";
+    const trk = document.createElement("span"); trk.className = "track"; const f = document.createElement("span"); f.className = "fill late"; f.style.width = Math.min(100, tr.median / 15 * 100) + "%"; trk.appendChild(f);
+    const v = document.createElement("span"); v.className = "cbv"; v.textContent = tr.median.toFixed(1);
+    cb.append(trk, v); c2.appendChild(cb);
+    r.insertCell().textContent = sgn(tr.gained, 1, true);
+    r.insertCell().textContent = `${Math.round(tr.share * tr.days)} of ${tr.days}`;
+  }
+  host.appendChild(t);
+})();
+
 /* ---------- waits at the stop ---------- */
 add("fig-wait", (host, W) => {
   const all = D.wait.find(r => r.route === "all"), rows = D.wait.filter(r => r.route !== "all").sort((a, b) => b.median - a.median);
@@ -957,49 +1092,62 @@ add("fig-predict", (host, W) => {
 
 /* ---------- riders on board through the day ---------- */
 add("fig-riders", (host, W) => {
-  const H = 240, m = { l: 40, r: 12, t: 22, b: 30 };
-  const s = svgIn(host, W, H, "Riders on board all buses through the day, Thursday and Friday");
-  const x = lin(240, 1380, m.l, W - m.r), y = lin(0, 500, H - m.b, m.t);
-  for (const t of [100, 200, 300, 400, 500]) { hline(s, m.l, W - m.r, y(t), "grid"); tx(s, m.l - 6, y(t) + 4, String(t), "", "end"); }
+  const C = D.riders_curve, raw = { weekday: C.weekday || [], sat: C.sat || [], sun: C.sun || [] };
+  // Drawn as 15-minute rolling means of the 5-minute averages; the readout and table give the 5-minute values.
+  const smooth = c => c.map((p, i) => { const w = c.slice(Math.max(0, i - 1), i + 2), mean = k => w.reduce((a, q) => a + q[k], 0) / w.length; return [p[0], mean(1), mean(2), mean(3)]; });
+  const wk = smooth(raw.weekday), sat = smooth(raw.sat), sun = smooth(raw.sun);
+  const H = 250, m = { l: 40, r: 12, t: 22, b: 30 };
+  const s = svgIn(host, W, H, "Riders on board all buses through the day: the average weekday with its range, Saturdays and Sundays");
+  const ymax = Math.ceil(Math.max(...wk.map(p => p[3])) / 100) * 100;
+  const x = lin(240, 1380, m.l, W - m.r), y = lin(0, ymax, H - m.b, m.t), X = p => x(p[0] + 2.5);
+  for (let t = 100; t <= ymax; t += 100) { hline(s, m.l, W - m.r, y(t), "grid"); tx(s, m.l - 6, y(t) + 4, String(t), "", "end"); }
   hline(s, m.l, W - m.r, y(0), "base");
   for (const h of [6, 9, 12, 15, 18, 21]) tx(s, x(h * 60), H - m.b + 16, hourLabel(h), "", "middle");
-  const cls = { "2026-09-24": "l-ran", "2026-09-25": "l-ink" };
-  for (const d of DAYS) {
-    const c = D.riders_curve[d] || [];
-    mk("path", { d: linePath(c.map(p => [x(p[0] + 2.5), y(p[1])])), class: cls[d] }, s);
-    const pk = c.reduce((b, p) => p[1] > b[1] ? p : b, c[0]);
-    mk("circle", { cx: x(pk[0] + 2.5), cy: y(pk[1]), r: 3.5, class: (d === DAYS[0] ? "f-ran" : "f-ink") + " ring" }, s);
-    tx(s, x(pk[0] + 2.5) + (d === DAYS[0] ? -7 : 7), y(pk[1]) - 6, `${Math.round(pk[1])} ${d === DAYS[0] ? "Thu" : "Fri"}`, "t-sm t-ink2", d === DAYS[0] ? "end" : "start");
+  mk("path", { d: areaPath(wk.map(p => [X(p), y(p[3])]), wk.map(p => [X(p), y(p[2])])), class: "band" }, s);
+  mk("path", { d: linePath(sun.map(p => [X(p), y(p[1])])), class: "l-ran", style: "stroke-dasharray:4 3" }, s);
+  mk("path", { d: linePath(sat.map(p => [X(p), y(p[1])])), class: "l-ran" }, s);
+  mk("path", { d: linePath(wk.map(p => [X(p), y(p[1])])), class: "l-ink" }, s);
+  const peak = c => c.reduce((b, p) => p[1] > b[1] ? p : b, c[0]);
+  const pw = peak(wk);
+  mk("circle", { cx: X(pw), cy: y(pw[1]), r: 3.5, class: "f-ink ring" }, s);
+  tx(s, X(pw) + 7, y(pw[1]) - 6, `${Math.round(pw[1])} on an average weekday`, "t-sm t-ink2 halo");
+  for (const [c, name] of [[sat, "Saturdays"], [sun, "Sundays"]]) {
+    if (!c.length) continue;
+    const pk = peak(c);
+    tx(s, X(pk), y(pk[1]) - 7, name, "t-sm t-it t-ink2 halo", "middle");
   }
   const xh = vline(s, -10, m.t, H - m.b, "xhair"); xh.style.display = "none";
-  const idx = {}; for (const d of DAYS) idx[d] = Object.fromEntries((D.riders_curve[d] || []).map(p => [p[0], p]));
+  const idx = c => Object.fromEntries(c.map(p => [p[0], p]));
+  const I = { weekday: idx(raw.weekday), sat: idx(raw.sat), sun: idx(raw.sun) };
   const hit = mk("rect", { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.b - m.t, class: "hit clear", tabindex: 0, "aria-label": "Riders on board through the day" }, s);
   hover(hit, e => {
     let mm = 940;
     if (e && e.clientX != null && e.type !== "focus") { const px = e.clientX - s.getBoundingClientRect().left; mm = 240 + (px - m.l) / (W - m.l - m.r) * 1140; }
     mm = clamp(Math.floor(mm / 5) * 5, 240, 1375);
     xh.style.display = ""; xh.setAttribute("x1", Math.round(x(mm + 2.5)) + .5); xh.setAttribute("x2", Math.round(x(mm + 2.5)) + .5);
-    const rows = DAYS.map(d => { const p = idx[d][mm]; return p ? { v: `${Math.round(p[1])} riders`, l: `${DAYNAME[d]}, on ${Math.round(p[2])} buses`, key: d === DAYS[0] ? "ran" : "ink" } : { v: "–", l: DAYNAME[d] }; });
-    return [hhmm(mm), rows];
+    const w = I.weekday[mm], a = I.sat[mm], u = I.sun[mm];
+    return [hhmm(mm), [
+      w ? { v: `${Math.round(w[1])} riders`, l: `average weekday (${Math.round(w[2])}–${Math.round(w[3])})`, key: "ink" } : { v: "–", l: "weekdays" },
+      a ? { v: `${Math.round(a[1])} riders`, l: "Saturdays", key: "ran" } : { v: "–", l: "Saturdays" },
+      u ? { v: `${Math.round(u[1])} riders`, l: "Sundays" } : { v: "–", l: "Sundays" }]];
   }, () => { xh.style.display = "none"; });
   const hrs = []; for (let h = 4; h <= 22; h++) hrs.push(h);
-  table("tv-riders", ["Hour", "Thursday riders (avg)", "Friday riders (avg)"], hrs.map(h => {
-    const avg = d => { const v = (D.riders_curve[d] || []).filter(p => Math.floor(p[0] / 60) === h).map(p => p[1]); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null; };
-    return [`${h}:00`, avg(DAYS[0]), avg(DAYS[1])];
-  }));
+  const avg = (c, h) => { const v = c.filter(p => Math.floor(p[0] / 60) === h).map(p => p[1]); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null; };
+  table("tv-riders", ["Hour", "Weekdays (avg riders)", "Saturdays", "Sundays"], hrs.map(h => [`${h}:00`, avg(raw.weekday, h), avg(raw.sat, h), avg(raw.sun, h)]));
 });
 
 /* ---------- fleet against the timetable ---------- */
 add("fig-fleet", (host, W) => {
-  const ph = 124, gap = 18, m = { l: 34, r: 12, t: 20, b: 26 }, H = 2 * ph + gap + m.b;
-  const s = svgIn(host, W, H, "Buses in service against trips in progress, Thursday and Friday");
+  const ph = 112, gap = 16, m = { l: 34, r: 12, t: 20, b: 26 }, H = 3 * ph + 2 * gap + m.b;
+  const s = svgIn(host, W, H, "Buses in service against trips in progress, average weekday, Saturday and Sunday");
   const x = lin(240, 1380, m.l, W - m.r);
-  DAYS.forEach((d, di) => {
+  DAYTYPES.forEach(([dt, label], di) => {
     const oy = di * (ph + gap), g = mk("g", { transform: `translate(0,${oy})` }, s);
-    const y = lin(0, 60, ph - 6, m.t), rows = (D.fleet[d] || []).filter(r => r[0] >= 300);
-    tx(g, m.l, 12, DAYNAME[d], "t-it t-ink2");
+    const y = lin(0, 60, ph - 6, m.t), rows = (D.fleet[dt] || []).filter(r => r[0] >= 300);
+    tx(g, m.l, 12, `${label} (${(D.meta.service_days || {})[dt] || 0})`, "t-it t-ink2");
     for (const t of [20, 40, 60]) { hline(g, m.l, W - m.r, y(t), "grid"); tx(g, m.l - 6, y(t) + 4, String(t), "", "end"); }
     hline(g, m.l, W - m.r, y(0), "base");
+    if (!rows.length) return;
     let run = [];
     const flush = () => { if (run.length > 1) mk("path", { d: areaPath(run.map(r => [x(r[0] + 7.5), y(r[2])]), run.map(r => [x(r[0] + 7.5), y(r[1])])), class: "wash-late" }, g); run = []; };
     for (const r of rows) { if (r[1] < r[2]) run.push(r); else flush(); }
@@ -1007,18 +1155,18 @@ add("fig-fleet", (host, W) => {
     mk("path", { d: linePath(rows.map(r => [x(r[0] + 7.5), y(r[2])])), class: "l-ran" }, g);
     mk("path", { d: linePath(rows.map(r => [x(r[0] + 7.5), y(r[1])])), class: "l-ink", style: "stroke-width:1.6" }, g);
     const xh = vline(g, -10, m.t, ph - 6, "xhair"); xh.style.display = "none";
-    const hit = mk("rect", { x: m.l, y: m.t, width: W - m.l - m.r, height: ph - 6 - m.t, class: "hit clear", tabindex: 0, "aria-label": `Fleet on ${DAYNAME[d]}` }, g);
+    const hit = mk("rect", { x: m.l, y: m.t, width: W - m.l - m.r, height: ph - 6 - m.t, class: "hit clear", tabindex: 0, "aria-label": `Fleet, ${label}` }, g);
     hover(hit, e => {
       let r = rows[Math.floor(rows.length / 2)];
       if (e && e.clientX != null && e.type !== "focus") { const px = e.clientX - s.getBoundingClientRect().left, mm = 240 + (px - m.l) / (W - m.l - m.r) * 1140; r = rows.reduce((b, q) => Math.abs(q[0] + 7.5 - mm) < Math.abs(b[0] + 7.5 - mm) ? q : b, rows[0]); }
       xh.style.display = ""; xh.setAttribute("x1", Math.round(x(r[0] + 7.5)) + .5); xh.setAttribute("x2", Math.round(x(r[0] + 7.5)) + .5);
-      return [`${DAYNAME[d]}, ${hhmm(r[0])}–${hhmm(r[0] + 15)}`, [{ v: String(r[1]), l: "buses in service", key: "ink" }, { v: String(r[2]), l: "trips in progress", key: "ran" }, { v: String(r[1] - r[2]), l: "difference" }]];
+      return [`${label}, ${hhmm(r[0])}–${hhmm(r[0] + 15)}`, [{ v: r[1].toFixed(1), l: "buses in service, on average", key: "ink" }, { v: r[2].toFixed(1), l: "trips in progress", key: "ran" }, { v: sgn(r[1] - r[2], 1, true), l: "difference" }]];
     }, () => { xh.style.display = "none"; });
   });
   for (const h of [6, 9, 12, 15, 18, 21]) tx(s, x(h * 60), H - 8, hourLabel(h), "", "middle");
   const rowsT = [];
-  for (const d of DAYS) for (const r of (D.fleet[d] || [])) if (r[0] % 60 === 0 && r[0] >= 300) rowsT.push([DAYNAME[d], hhmm(r[0]), r[1], r[2], r[1] - r[2]]);
-  table("tv-fleet", ["Day", "Time", "Buses in service", "Trips in progress", "Difference"], rowsT);
+  for (const [dt, label] of DAYTYPES) for (const r of (D.fleet[dt] || [])) if (r[0] % 60 === 30 && r[0] >= 300) rowsT.push([label, hhmm(r[0]), r[1].toFixed(1), r[2].toFixed(1), (r[1] - r[2]).toFixed(1)]);
+  table("tv-fleet", ["Days", "Time", "Buses in service (avg)", "Trips in progress (avg)", "Difference"], rowsT);
 });
 
 /* ---------- loads per route ---------- */
@@ -1081,6 +1229,7 @@ add("fig-loads", (host, W) => {
     { h: "Never ran", key: r => r.miss, cell: (td, r) => { const cb = bar(r.miss, "late"); cb.lastChild.textContent = `${r.never} · ${pct(r.miss)}`; cb.lastChild.style.minWidth = "4.6em"; td.appendChild(cb); } },
     { h: "On time", key: r => r.on_time, cell: (td, r) => td.appendChild(bar(r.on_time, "ontime")) },
     { h: "5+ min late", key: r => r.late, cell: (td, r) => td.appendChild(bar(r.late, "late")) },
+    { h: "Weekdays 5+ late", key: r => r.late_wk, cell: (td, r) => td.appendChild(bar(r.late_wk, "late")) },
     { h: "2+ min early", key: r => r.early, cell: (td, r) => td.appendChild(bar(r.early, "early")) },
     { h: "Left on time", key: r => r.dep_on_time == null ? -1 : r.dep_on_time, cell: (td, r) => { td.textContent = r.dep_on_time == null ? "–" : `${pct(r.dep_on_time)} of ${r.dep_n}`; } },
     { h: "Median wait", key: r => r.wait == null ? -1 : r.wait, cell: (td, r) => { td.textContent = r.wait == null ? "–" : r.wait.toFixed(1) + " min"; } },

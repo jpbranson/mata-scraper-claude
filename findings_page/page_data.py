@@ -1,16 +1,21 @@
-"""Everything the findings page draws, and every number the written
-findings (knowledge/findings/) quote, from one copy of data/ (made by
-snapshot.py; never the live files).
+"""Everything the findings page draws, and the numbers its text quotes, from
+one copy of data/ (made by snapshot.py; never the live files). Laid out for
+weeks of data: weekdays apart from Saturdays and Sundays wherever they
+differ. If the copy holds data/gtfs.zip, stretches are measured along the
+route (the timetable's shape_dist_traveled) rather than in a straight line.
 Writes out/page_data.json (for the page) and out/numbers.txt (for the text).
 
     .venv\\Scripts\\python findings_page\\page_data.py [SNAPSHOT_DIR]
 """
+import csv
+import io
 import json
 import math
 import os
 import pathlib
 import re
 import sys
+import zipfile
 from collections import defaultdict
 
 import duckdb
@@ -19,10 +24,8 @@ HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parent
 SNAP = pathlib.Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else HERE / "snapshot"
 OUT = HERE / "out"
-# The day MATA's official feed covers in full: trips it saw, and its alerts,
-# are counted on this day. The page is laid out for this day and the one
-# before it (DAYS in template.html).
-FEED_DAY = "2026-09-25"
+# Weekday, Saturday or Sunday, for a timestamp or date expression.
+DAY_TYPE = "CASE dayofweek({0}) WHEN 6 THEN 'sat' WHEN 0 THEN 'sun' ELSE 'weekday' END"
 
 OUT.mkdir(exist_ok=True)
 os.chdir(SNAP)          # analysis.sql reads data/... and stops.csv relative to here
@@ -45,6 +48,12 @@ def r1(x, n=1):
     return None if x is None else round(float(x), n)
 
 
+# Service days: 6+ hours recorded (the 55 minutes of Wed 2026-09-23 aren't one).
+con.sql(f"""CREATE TABLE service_days AS
+SELECT t::date AS d, strftime(t::date, '%Y-%m-%d') AS day, {DAY_TYPE.format('t::date')} AS day_type
+FROM pos GROUP BY 1 HAVING date_diff('hour', min(t), max(t)) >= 6""")
+
+
 D = {}          # page data
 N = []          # numbers for knowledge/findings/, as text lines
 
@@ -65,16 +74,18 @@ days = rows("""SELECT t::date::varchar, strftime(min(t), '%H:%M'), strftime(max(
                FROM pos GROUP BY 1 ORDER BY 1""")
 D["meta"] = {"rows": m[0], "polls": m[1], "buses": m[2], "first": m[3], "last": m[4],
              "official_snapshots": o[0], "official_first": o[1], "official_last": o[2],
-             "days": [{"day": d, "first": f, "last": l, "rows": n} for d, f, l, n in days]}
+             "days": [{"day": d, "first": f, "last": l, "rows": n} for d, f, l, n in days],
+             "service_days": dict(rows("SELECT day_type, count(*) FROM service_days GROUP BY 1 ORDER BY 1"))}
 note("META", D["meta"])
 
 # ---------------------------------------------------------------- Q1, Q2
 q1 = rows("""SELECT route_id, count(*), median(delay_seconds) / 60,
                     avg((delay_seconds > 300)::int), avg((delay_seconds < -60)::int),
-                    avg((delay_seconds BETWEEN -60 AND 300)::int)
+                    avg((delay_seconds BETWEEN -60 AND 300)::int),
+                    avg((delay_seconds > 300)::int) FILTER (WHERE dayofweek(t) BETWEEN 1 AND 5)
              FROM good GROUP BY 1 ORDER BY 4 DESC, 1""")
-D["q1"] = [{"route": r, "polls": n, "median": r1(md), "late": r1(l, 3), "early": r1(e, 3), "on_time": r1(ot, 3)}
-           for r, n, md, l, e, ot in q1]
+D["q1"] = [{"route": r, "polls": n, "median": r1(md), "late": r1(l, 3), "early": r1(e, 3), "on_time": r1(ot, 3),
+            "late_wk": r1(lw, 3)} for r, n, md, l, e, ot, lw in q1]
 tot = one("""SELECT count(*), avg((delay_seconds > 300)::int), avg((delay_seconds < -60)::int),
                     avg((delay_seconds BETWEEN -60 AND 300)::int),
                     (SELECT count(*) FROM pos)
@@ -206,7 +217,7 @@ note("DEPART", D["depart_all"])
 # ---------------------------------------------------------------- where delay builds up
 wh = rows("""WITH a AS (
     SELECT day, route, headsign, trip, vehicle, stop, t, delay,
-           delay - lag(delay) OVER w AS gained, t - lag(t) OVER w AS secs
+           greatest(delay, 0) - greatest(lag(delay) OVER w, 0) AS gained, t - lag(t) OVER w AS secs
     FROM arrivals_due WINDOW w AS (PARTITION BY day, trip, vehicle ORDER BY t))
 SELECT a.route, s.stop_name, a.headsign, count(*), avg(gained) / 60,
        sum(gained) / 60 / count(DISTINCT day), arg_min(s.lat, s.stop_code), arg_min(s.lon, s.stop_code)
@@ -220,7 +231,7 @@ note("WHERE", D["where"][:10])
 se = rows("""WITH trips AS (
     SELECT day, route, trip, vehicle, arg_min(delay, t) AS first_delay, arg_max(delay, t) AS last_delay,
            (max(t) - min(t)) / 60 AS minutes_logged
-    FROM arrivals_due GROUP BY ALL)
+    FROM arrivals_due WHERE dayofweek(strptime(day, '%Y-%m-%d')) BETWEEN 1 AND 5 GROUP BY ALL)
 SELECT route, count(*), avg(first_delay) / 60, avg(last_delay) / 60, median(first_delay) / 60,
        median(last_delay) / 60, avg(last_delay - first_delay) / 60, avg((last_delay - first_delay > 300)::int)
 FROM trips WHERE minutes_logged >= 20 GROUP BY route ORDER BY 7 DESC, 1""")
@@ -242,17 +253,18 @@ D["direction"] = [{"route": r, "in": r1(v["in"][1] / v["in"][0], 3) if v["in"][0
                    "in_polls": v["in"][0], "out_polls": v["out"][0], "heads": v["heads"]}
                   for r, v in sorted(by.items())]
 note("DIRECTION", [(d["route"], d["in"], d["out"]) for d in D["direction"]])
-hr = rows("""SELECT hour(t), count(*), avg((delay_seconds > 300)::int), avg((delay_seconds < -60)::int),
-                    median(delay_seconds) / 60
-             FROM good GROUP BY 1 ORDER BY 1""")
-D["hour"] = [{"h": h, "polls": n, "late": r1(l, 3), "early": r1(e, 3), "median": r1(md)} for h, n, l, e, md in hr]
+hr = rows(f"""SELECT {DAY_TYPE.format('t')}, hour(t), count(*), avg((delay_seconds > 300)::int),
+                     avg((delay_seconds < -60)::int), median(delay_seconds) / 60
+              FROM good GROUP BY 1, 2 HAVING count(*) >= 300 ORDER BY 1, 2""")
+D["hour"] = {dt: [{"h": h, "polls": n, "late": r1(l, 3), "early": r1(e, 3), "median": r1(md)}
+                  for t_, h, n, l, e, md in hr if t_ == dt] for dt in ("weekday", "sat", "sun")}
 hrr = rows("""SELECT route_id, hour(t), count(*), avg((delay_seconds > 300)::int)
-              FROM good GROUP BY 1, 2 HAVING count(*) >= 60 ORDER BY 1, 2""")
+              FROM good WHERE dayofweek(t) BETWEEN 1 AND 5 GROUP BY 1, 2 HAVING count(*) >= 60 ORDER BY 1, 2""")
 hr_route = defaultdict(list)
 for r, h, n, l in hrr:
     hr_route[r].append([h, n, r1(l, 3)])
 D["hour_route"] = hr_route
-note("HOUR", [(d["h"], d["late"], d["early"]) for d in D["hour"]])
+note("HOUR", {dt: [(d["h"], d["late"], d["early"]) for d in v] for dt, v in D["hour"].items()})
 
 # ---------------------------------------------------------------- early running mid-route
 er = rows("""SELECT a.route, tp.name, count(*), avg((a.delay < -60)::int),
@@ -287,12 +299,14 @@ cor = one("""SELECT corr(a, l) FROM (SELECT avg(occupancy_pct) AS a, avg((delay_
 D["load_delay_corr"] = r1(cor[0], 2)
 note("LOAD_DELAY", D["load_delay"], "corr", D["load_delay_corr"])
 rd = rows("""WITH polls AS (SELECT observed_at, any_value(t) AS t, sum(occupancy_pct) / 2 AS riders, count(*) AS buses
-                           FROM pos GROUP BY observed_at)
-             SELECT t::date::varchar, (hour(t) * 60 + minute(t)) // 5 * 5, avg(riders), avg(buses)
-             FROM polls GROUP BY 1, 2 ORDER BY 1, 2""")
+                           FROM pos GROUP BY observed_at),
+slot AS (SELECT t::date AS d, (hour(t) * 60 + minute(t)) // 5 * 5 AS mnt, avg(riders) AS riders, avg(buses) AS buses
+         FROM polls GROUP BY 1, 2)
+SELECT s.day_type, mnt, avg(riders), min(riders), max(riders), avg(buses), count(*)
+FROM slot JOIN service_days s USING (d) GROUP BY 1, 2 ORDER BY 1, 2""")
 rdd = defaultdict(list)
-for d, mnt, rv, bv in rd:
-    rdd[d].append([mnt, r1(rv, 0), r1(bv, 1)])
+for dt, mnt, av, lo, hi, bv, n in rd:
+    rdd[dt].append([mnt, r1(av, 0), r1(lo, 0), r1(hi, 0), r1(bv, 1), n])
 D["riders_curve"] = rdd
 rday = rows("""WITH polls AS (
     SELECT observed_at, any_value(t) AS t, sum(occupancy_pct) / 2 AS riders FROM pos GROUP BY observed_at),
@@ -306,15 +320,18 @@ SELECT w.t::date::varchar, dayname(w.t::date), round(sum(riders * secs) / 3600),
        strftime(min(w.t), '%H:%M'), strftime(max(w.t), '%H:%M')
 FROM w JOIN bd ON bd.day = w.t::date GROUP BY 1, 2 ORDER BY 1""")
 D["riders_day"] = [{"day": d, "dow": w, "rider_hours": rh, "peak": pk, "peak_at": pa, "boardings": bo,
-                    "from": f, "to": t} for d, w, rh, pk, pa, bo, f, t in rday]
+                    "from": f, "to": t} for d, w, rh, pk, pa, bo, f, t in rday
+                   if d in {x for (x,) in rows("SELECT day FROM service_days")}]
 note("RIDERS_DAY", D["riders_day"])
 bo = rows("""WITH d AS (
-    SELECT route_id, t, lag(next_stop_name) OVER v AS stop,
+    SELECT route_id, t::date AS d, lag(next_stop_name) OVER v AS stop,
            (occupancy_pct - lag(occupancy_pct) OVER v) / 2 AS change, observed_at - lag(observed_at) OVER v AS gap
-    FROM pos WINDOW v AS (PARTITION BY vehicle_id ORDER BY observed_at))
+    FROM pos WINDOW v AS (PARTITION BY vehicle_id ORDER BY observed_at)),
+n AS (SELECT count(*) AS days FROM service_days WHERE day_type = 'weekday')
 SELECT stop, string_agg(DISTINCT route_id, ',' ORDER BY route_id),
-       sum(greatest(change, 0)) / count(DISTINCT t::date), sum(greatest(-change, 0)) / count(DISTINCT t::date)
-FROM d WHERE stop IS NOT NULL AND gap <= 30 GROUP BY stop ORDER BY 3 DESC, 1 LIMIT 12""")
+       sum(greatest(change, 0)) / any_value(n.days), sum(greatest(-change, 0)) / any_value(n.days)
+FROM d JOIN service_days s USING (d), n
+WHERE stop IS NOT NULL AND gap <= 30 AND s.day_type = 'weekday' GROUP BY stop ORDER BY 3 DESC, 1 LIMIT 12""")
 D["boardings"] = [{"stop": s, "routes": r, "on": r1(a, 0), "off": r1(b, 0)} for s, r, a, b in bo]
 note("BOARDINGS", D["boardings"])
 
@@ -324,14 +341,16 @@ slots AS (SELECT t::date::varchar AS day, (hour(t) * 60 + minute(t)) // 15 * 15 
                  arg_min(observed_at, (abs((hour(t) * 60 + minute(t)) % 15 * 60 + second(t) - 450), observed_at)) AS at_,
                  arg_min(buses, (abs((hour(t) * 60 + minute(t)) % 15 * 60 + second(t) - 450), observed_at)) AS buses
           FROM polls GROUP BY ALL),
-trips AS (SELECT day, trip, min(t_sched) AS t0, max(t_sched) AS t1 FROM sched GROUP BY ALL)
-SELECT s.day, s.slot, s.buses, count(x.trip)
-FROM slots s LEFT JOIN trips x ON x.day = s.day AND s.at_ BETWEEN x.t0 AND x.t1
-GROUP BY ALL ORDER BY 1, 2""")
+trips AS (SELECT day, trip, min(t_sched) AS t0, max(t_sched) AS t1 FROM sched GROUP BY ALL),
+per AS (SELECT s.day, s.slot, s.buses, count(x.trip) AS scheduled
+        FROM slots s LEFT JOIN trips x ON x.day = s.day AND s.at_ BETWEEN x.t0 AND x.t1 GROUP BY ALL)
+SELECT d.day_type, slot, avg(buses), avg(scheduled), count(*)
+FROM per JOIN service_days d USING (day) GROUP BY 1, 2 ORDER BY 1, 2""")
 fld = defaultdict(list)
-for d, sl, b, sch in fl:
-    fld[d].append([sl, b, sch])
+for dt, sl, b, sch, n in fl:
+    fld[dt].append([sl, r1(b), r1(sch), n])
 D["fleet"] = fld
+note("FLEET", {dt: [r for r in v if r[0] % 60 == 30] for dt, v in fld.items()})
 
 # ---------------------------------------------------------------- speed
 spd = rows("""SELECT route_id, avg(speed_raw) * 2.237,
@@ -342,15 +361,30 @@ spd = rows("""SELECT route_id, avg(speed_raw) * 2.237,
 D["speed_route"] = [{"route": r, "mph": r1(a), "peak": r1(p), "midday": r1(md), "stopped": r1(s, 2)}
                     for r, a, p, md, s in spd]
 note("SPEED_ROUTE", D["speed_route"])
+gtfs = SNAP / "data" / "gtfs.zip"
+sd = []
+if gtfs.exists():
+    with zipfile.ZipFile(gtfs) as z:
+        for r in csv.DictReader(io.TextIOWrapper(z.open("stop_times.txt"), "utf-8-sig")):
+            if r.get("shape_dist_traveled"):
+                sd.append((r["trip_id"], r["stop_id"].split(":", 1)[-1], int(r["stop_sequence"]),
+                           float(r["shape_dist_traveled"])))
+con.sql("CREATE TABLE stop_dist (trip VARCHAR, stop VARCHAR, seq INTEGER, sd DOUBLE)")
+if sd:
+    con.executemany("INSERT INTO stop_dist VALUES (?, ?, ?, ?)", sd)
+note("STOP_DIST rows (route distances from the timetable)", len(sd))
 sl = rows("""WITH a AS (
     SELECT route, trip, vehicle, day, stop, t, lag(stop) OVER w AS prev_stop, lag(t) OVER w AS prev_t
     FROM arrivals_due WINDOW w AS (PARTITION BY day, trip, vehicle ORDER BY t)),
 seg AS (
     SELECT a.route, s1.stop_name AS from_stop, s2.stop_name AS to_stop, a.prev_stop AS c1, a.stop AS c2,
            s1.lat AS la1, s1.lon AS lo1, s2.lat AS la2, s2.lon AS lo2,
-           dist_m(s1.lat, s1.lon, s2.lat, s2.lon) AS m, a.t - a.prev_t AS secs
+           coalesce(x2.sd - x1.sd, dist_m(s1.lat, s1.lon, s2.lat, s2.lon)) AS m, a.t - a.prev_t AS secs
     FROM a JOIN stops s1 ON s1.stop_code = a.prev_stop JOIN stops s2 ON s2.stop_code = a.stop
-    WHERE a.prev_t IS NOT NULL AND a.t - a.prev_t BETWEEN 10 AND 900)
+    LEFT JOIN stop_dist x1 ON x1.trip = a.trip AND x1.stop = a.prev_stop
+    LEFT JOIN stop_dist x2 ON x2.trip = a.trip AND x2.stop = a.stop AND x2.seq > x1.seq
+    WHERE a.prev_t IS NOT NULL AND a.t - a.prev_t BETWEEN 10 AND 900
+    QUALIFY row_number() OVER (PARTITION BY a.day, a.trip, a.vehicle, a.t ORDER BY x2.seq - x1.seq NULLS LAST) = 1)
 SELECT route, from_stop, to_stop, count(*), avg(m), avg(secs), sum(m) / sum(secs) * 2.237,
        arg_min(la1, c1), arg_min(lo1, c1), arg_min(la2, c2), arg_min(lo2, c2)
 FROM seg GROUP BY route, from_stop, to_stop HAVING count(*) >= 20 AND avg(m) >= 300
@@ -382,11 +416,10 @@ D["headway_route"] = [{"route": r, "pairs": n, "planned": r1(p, 0), "gaps": r1(g
 note("HEADWAY", D["headway"], D["headway_route"])
 
 # ---------------------------------------------------------------- missed service
-bar = rows("""SELECT day, route, hour(to_timestamp(due) AT TIME ZONE 'America/Chicago') * 60
-                                + minute(to_timestamp(due) AT TIME ZONE 'America/Chicago'),
-                     ran::int, canceled::int, trim(headsign)
-              FROM trip_service ORDER BY 1, 2, 3, 6, 4, 5""")
-D["barcode"] = [list(x) for x in bar]
+grid = rows("""SELECT route, day, count(*), count(*) FILTER (WHERE NOT ran),
+                      count(*) FILTER (WHERE NOT ran AND canceled)
+               FROM trip_service GROUP BY ALL ORDER BY 1, 2""")
+D["missed_grid"] = [list(x) for x in grid]
 mt = rows("""SELECT day, count(*), count(*) FILTER (WHERE NOT ran), count(*) FILTER (WHERE NOT ran AND canceled),
                     count(*) FILTER (WHERE ran AND canceled),
                     strftime(to_timestamp(max(due)) AT TIME ZONE 'America/Chicago', '%H:%M')
@@ -394,36 +427,44 @@ mt = rows("""SELECT day, count(*), count(*) FILTER (WHERE NOT ran), count(*) FIL
 D["missed_days"] = [{"day": d, "scheduled": s, "never": n, "canceled": c, "ran_canceled": rc, "due_by": db}
                     for d, s, n, c, rc, db in mt]
 note("MISSED_DAYS", D["missed_days"])
+late_by_day = {d["day"]: d for d in D["q2"]}
+D["days"] = [{"day": m_["day"], "dow": late_by_day[m_["day"]]["dow"], "late": late_by_day[m_["day"]]["late"],
+              "scheduled": m_["scheduled"], "never": m_["never"]}
+             for m_ in D["missed_days"] if m_["day"] in {x for (x,) in rows("SELECT day FROM service_days")}]
+note("DAYS", D["days"])
 mr = rows("""SELECT day, route, count(*), count(*) FILTER (WHERE NOT ran), count(*) FILTER (WHERE NOT ran AND canceled)
              FROM trip_service GROUP BY ALL ORDER BY 1, 4 DESC, 2""")
 note("MISSED_ROUTES", mr)
-mh = rows("""SELECT hour(to_timestamp(due) AT TIME ZONE 'America/Chicago'), count(*), count(*) FILTER (WHERE NOT ran)
-             FROM trip_service GROUP BY 1 ORDER BY 1""")
-D["missed_hour"] = [[h, s, n] for h, s, n in mh]
+mh = rows(f"""SELECT {DAY_TYPE.format('day::DATE')}, hour(to_timestamp(due) AT TIME ZONE 'America/Chicago'),
+                     count(*), count(*) FILTER (WHERE NOT ran)
+              FROM trip_service GROUP BY 1, 2 ORDER BY 1, 2""")
+D["missed_hour"] = {dt: [[h, s_, n] for t_, h, s_, n in mh if t_ == dt] for dt in ("weekday", "sat", "sun")}
 note("MISSED_HOUR", D["missed_hour"])
-ag = one(f"""WITH ours AS (
-    SELECT DISTINCT trip FROM arrivals WHERE day = '{FEED_DAY}' AND trip IS NOT NULL
-    UNION SELECT DISTINCT trip_id FROM pos WHERE trip_id IS NOT NULL AND strftime(t, '%Y-%m-%d') = '{FEED_DAY}'),
+# On the days MATA's feed covers (from 15 min after its first snapshot):
+# trips it saw run, against the ones the tracker saw.
+ag = one("""WITH ours AS (
+    SELECT DISTINCT day, trip FROM arrivals WHERE trip IS NOT NULL
+    UNION SELECT DISTINCT strftime(t, '%Y-%m-%d'), trip_id FROM pos WHERE trip_id IS NOT NULL),
 official AS (
-    SELECT DISTINCT trip_id AS trip FROM off_vehicles WHERE day = '{FEED_DAY}' AND trip_id IS NOT NULL
-    UNION SELECT DISTINCT trip_id FROM off_trip_updates WHERE day = '{FEED_DAY}' AND vehicle_id IS NOT NULL),
-t AS (SELECT trip FROM trip_service WHERE day = '{FEED_DAY}'
-      AND due >= (SELECT min(feed_ts) FROM off_vehicles) + 900)
+    SELECT DISTINCT day, trip_id AS trip FROM off_vehicles WHERE trip_id IS NOT NULL
+    UNION SELECT DISTINCT day, trip_id FROM off_trip_updates WHERE vehicle_id IS NOT NULL),
+t AS (SELECT day, trip FROM trip_service WHERE due >= (SELECT min(feed_ts) FROM off_vehicles) + 900)
 SELECT count(*), count(*) FILTER (WHERE o.trip IS NOT NULL),
        count(*) FILTER (WHERE o.trip IS NOT NULL AND u.trip IS NOT NULL),
        count(*) FILTER (WHERE o.trip IS NULL AND u.trip IS NOT NULL)
-FROM t LEFT JOIN ours u USING (trip) LEFT JOIN official o USING (trip)""")
+FROM t LEFT JOIN ours u USING (day, trip) LEFT JOIN official o USING (day, trip)""")
 D["agree"] = {"scheduled": ag[0], "official_ran": ag[1], "both": ag[2], "ours_only": ag[3]}
 note("AGREE", D["agree"])
-al = one(f"""SELECT count(DISTINCT id), count(DISTINCT routes) FROM off_alerts
-            WHERE strftime(to_timestamp(feed_ts) AT TIME ZONE 'America/Chicago', '%Y-%m-%d') = '{FEED_DAY}'""")
-D["alerts"] = {"alerts": al[0]}
+al = one("""SELECT count(DISTINCT id), count(DISTINCT strftime(to_timestamp(feed_ts) AT TIME ZONE 'America/Chicago', '%Y-%m-%d'))
+            FROM off_alerts""")
+D["alerts"] = {"alerts": al[0], "days": al[1]}
 note("ALERTS", al)
 
 # ---------------------------------------------------------------- trip matching, coverage
 tm = rows("""WITH o AS (
     SELECT DISTINCT vehicle_id AS equipment_no, reported_at, trip_id AS off_trip
-    FROM off_vehicles WHERE trip_id IS NOT NULL AND reported_at IS NOT NULL),
+    FROM off_vehicles WHERE trip_id IS NOT NULL AND reported_at IS NOT NULL
+      AND trip_id IN (SELECT trip FROM sched)),
 m AS (
     SELECT o.*, p.trip_id AS our_trip, p.route_id, p.next_stop_name, p.delay_capped
     FROM o JOIN pos p ON p.equipment_no = o.equipment_no
@@ -495,17 +536,27 @@ FROM predictions GROUP BY 1 ORDER BY min(predicted - feed_ts)""")
 D["predict_buckets"] = [{"bucket": b, "n": n, "within2": r1(w, 3), "early1": r1(e, 3), "late5": r1(l, 3),
                          "median": r1(md, 1)} for b, n, w, e, l, md in pb]
 note("PREDICT", D["predict_buckets"])
-lo = rows("""WITH first_stop AS (SELECT day, trip, arg_min(stop, t_sched) AS stop FROM sched GROUP BY ALL),
+lo = rows("""WITH first_stop AS (
+    SELECT day, trip, arg_min(stop, t_sched) AS stop, min(t_sched) AS due FROM sched GROUP BY ALL),
+moved AS (
+    SELECT vehicle_id, feed_ts
+    FROM (SELECT DISTINCT vehicle_id, feed_ts, lat, lon FROM off_vehicles WHERE lat IS NOT NULL)
+    WINDOW w AS (PARTITION BY vehicle_id ORDER BY feed_ts)
+    QUALIFY lag(lat) OVER w IS NULL OR dist_m(lag(lat) OVER w, lag(lon) OVER w, lat, lon) > 50),
 sat AS (
-    SELECT v.day, v.trip_id AS trip, (max(v.feed_ts) - min(v.feed_ts)) / 60 AS minutes
+    SELECT v.day, v.trip_id AS trip, any_value(v.vehicle_id) AS vehicle_id, any_value(f.due) AS due,
+           min(v.feed_ts) AS t_in, max(v.feed_ts) AS t_out
     FROM off_vehicles v JOIN first_stop f ON f.day = v.day AND f.trip = v.trip_id AND v.stop_id = '0:' || f.stop
     WHERE v.stop_status = 'STOPPED_AT' GROUP BY v.day, v.trip_id),
+lay AS (
+    SELECT s.*, (s.t_out - m.feed_ts) / 60 AS minutes, (s.due - m.feed_ts) / 60 AS slack
+    FROM sat s ASOF LEFT JOIN moved m ON m.vehicle_id = s.vehicle_id AND m.feed_ts <= s.t_in),
 start AS (SELECT day, trip, arg_min(delay, t) AS delay FROM arrivals_due GROUP BY ALL)
-SELECT count(*), median(s.minutes), avg((s.minutes < 5)::int),
-       avg((d.delay > 300)::int) FILTER (WHERE s.minutes < 5), avg((d.delay > 300)::int) FILTER (WHERE s.minutes >= 5)
-FROM sat s LEFT JOIN start d USING (day, trip)""")[0]
-D["layover"] = {"trips": lo[0], "median": r1(lo[1], 0), "under5": r1(lo[2], 2), "late_short": r1(lo[3], 2),
-                "late_long": r1(lo[4], 2)}
+SELECT count(*), median(l.minutes), median(l.slack), avg((l.slack < 0)::int),
+       avg((d.delay > 300)::int) FILTER (WHERE l.slack < 0), avg((d.delay > 300)::int) FILTER (WHERE l.slack >= 0)
+FROM lay l LEFT JOIN start d USING (day, trip)""")[0]
+D["layover"] = {"trips": lo[0], "median": r1(lo[1]), "before_due": r1(lo[2]), "arrived_late": r1(lo[3], 2),
+                "late_start_arrived_late": r1(lo[4], 2), "late_start_otherwise": r1(lo[5], 2)}
 note("LAYOVER", D["layover"])
 
 # ---------------------------------------------------------------- map: network, simplified, in metres
@@ -599,7 +650,7 @@ tab = []
 for r in routes:
     dl = dep_by_route.get(r, [])
     tab.append({"route": r, "scheduled": missed_by_route[r][0], "never": missed_by_route[r][1],
-                "late": q1m[r]["late"], "early": q1m[r]["early"], "on_time": q1m[r]["on_time"],
+                "late": q1m[r]["late"], "late_wk": q1m[r]["late_wk"], "early": q1m[r]["early"], "on_time": q1m[r]["on_time"],
                 "dep_n": len(dl), "dep_on_time": r1(sum(-1 <= x <= 5 for x in dl) / len(dl), 3) if dl else None,
                 "wait": waitm.get(r, {}).get("median"), "wait_over15": waitm.get(r, {}).get("over15"),
                 "riders": loadm[r]["avg"], "p95": loadm[r]["p95"]})
